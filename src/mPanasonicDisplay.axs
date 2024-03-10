@@ -137,6 +137,7 @@ DEFINE_TYPE
 (*               VARIABLE DEFINITIONS GO BELOW             *)
 (***********************************************************)
 DEFINE_VARIABLE
+
 volatile _NAVDisplay uDisplay
 
 volatile dev dvaCommObjects[3]
@@ -201,7 +202,7 @@ DEFINE_MUTUALLY_EXCLUSIVE
 (* EXAMPLE: DEFINE_CALL '<NAME>' (<PARAMETERS>) *)
 
 define_function SendStringRaw(char payload[]) {
-    NAVLog("'String To ', NAVConvertDPSToAscii(dvaCommObjects[iCommMode]), '-[', payload, ']'")
+    NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'String To ', NAVConvertDPSToAscii(dvaCommObjects[iCommMode]), '-[', payload, ']'")
     send_string dvaCommObjects[iCommMode], "payload"
 }
 
@@ -257,7 +258,7 @@ define_function TimeOut() {
     cancel_wait 'CommsTimeOut'
 
     wait 300 'CommsTimeOut' {
-        [vdvObject,DEVICE_COMMUNICATING] = false
+        [vdvObject, DEVICE_COMMUNICATING] = false
 
         if (CommModeIsIP(iCommMode)) {
             //uIPConnection.IsConnected = false
@@ -327,7 +328,7 @@ define_function Process() {
     }
 
     iSemaphore = true
-    //NAVLog("'Processing String From ',NAVConvertDPSToAscii(dvaCommObjects[iCommMode]), ' in Comm Mode[',itoa(iCommMode),']','-[',cRxBuffer[iCommMode],']'")
+    //NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'Processing String From ', NAVConvertDPSToAscii(dvaCommObjects[iCommMode]), ' in Comm Mode[', itoa(iCommMode), ']', '-[', cRxBuffer[iCommMode], ']'")
     while (length_array(cRxBuffer[iCommMode]) && NAVContains(cRxBuffer[iCommMode], COMM_MODE_DELIMITER[iCommMode])) {
         cTemp = remove_string(cRxBuffer[iCommMode], COMM_MODE_DELIMITER[iCommMode], 1)
 
@@ -336,195 +337,197 @@ define_function Process() {
             //MaintainIPConnection()
         }
 
-        if (length_array(cTemp)) {
-            NAVLog("'Parsing String From ', NAVConvertDPSToAscii(dvaCommObjects[iCommMode]), ' in Comm Mode[', GetCommMode(iCommMode), ']', '-[', cTemp, ']'")
+        if (!length_array(cTemp)) {
+            continue
+        }
 
-            cTemp = NAVStripCharsFromRight(cTemp, 1)    //Remove delimiter
+        NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'Parsing String From ', NAVConvertDPSToAscii(dvaCommObjects[iCommMode]), ' in Comm Mode[', GetCommMode(iCommMode), ']', '-[', cTemp, ']'")
 
-            select {
-                active (NAVStartsWith(cTemp,'NTCONTROL')): {// || NAVStartsWith(cTemp,'PDPCONTROL')): {
-                    //Connection Started
-                    cTemp = NAVStripCharsFromLeft(cTemp, 10);
-                    //remove_string(cTemp, ' ', 1)
-                    iSecureCommandRequired = atoi(remove_string(cTemp, ' ',1));
+        cTemp = NAVStripCharsFromRight(cTemp, 1)    //Remove delimiter
 
-                    if (iSecureCommandRequired) {
-                        cMD5RandomNumber = cTemp;
-                        //if (len(password) > 0 && len(user_name) > 0) {
-                            cMD5StringToEncode = "cUserName, ':', cPassword, ':', cMD5RandomNumber"
-                        //}//else {
-                            //sMD5StringToEncode = DEFAULT_USER_NAME + ":" + DEFAULT_PASSWORD + ":" + sMD5RandomNumber;
-                        //}
-                    }
+        select {
+            active (NAVStartsWith(cTemp, 'NTCONTROL')): {// || NAVStartsWith(cTemp, 'PDPCONTROL')): {
+                //Connection Started
+                cTemp = NAVStripCharsFromLeft(cTemp, 10);
+                //remove_string(cTemp, ' ', 1)
+                iSecureCommandRequired = atoi(remove_string(cTemp, ' ', 1));
 
-                    iConnectionStarted = 1;
-                    iLoop = 0;
-                    Drive();
+                if (iSecureCommandRequired) {
+                    cMD5RandomNumber = cTemp;
+                    //if (len(password) > 0 && len(user_name) > 0) {
+                        cMD5StringToEncode = "cUserName, ':', cPassword, ':', cMD5RandomNumber"
+                    //}//else {
+                        //sMD5StringToEncode = DEFAULT_USER_NAME + ":" + DEFAULT_PASSWORD + ":" + sMD5RandomNumber;
+                    //}
                 }
-                active (NAVStartsWith(cTemp, COMM_MODE_HEADER[iCommMode])): {
-                    remove_string(cTemp, COMM_MODE_HEADER[iCommMode],1)
 
-                    if (NAVStartsWith(cTemp,'ER')) {
+                iConnectionStarted = 1;
+                iLoop = 0;
+                Drive();
+            }
+            active (NAVStartsWith(cTemp, COMM_MODE_HEADER[iCommMode])): {
+                remove_string(cTemp, COMM_MODE_HEADER[iCommMode], 1)
+
+                if (NAVStartsWith(cTemp, 'ER')) {
+                    iPollSequence = GET_POWER
+                    continue
+                }
+
+                if (NAVContains(cTemp, 'AD94;RAD:')) {
+                    stack_var char cTempID[3]
+
+                    remove_string(cTemp, ':', 1)
+
+                    cTempID = NAVStripCharsFromRight(remove_string(cTemp, ';', 1), 1)
+
+                    if (cTempID != cID) {
                         iPollSequence = GET_POWER
                         continue
                     }
+                }
 
-                    if (NAVContains(cTemp, 'AD94;RAD:')) {
-                        stack_var char cTempID[3]
+                switch (iCommMode) {
+                    case COMM_MODE_SERIAL:
+                    case COMM_MODE_IP_INDIRECT: {
+                        stack_var char cAttribute[NAV_MAX_CHARS]
 
-                        remove_string(cTemp, ':', 1)
+                        cAttribute = NAVStripCharsFromRight(remove_string(cTemp, ':', 1), 1)
 
-                        cTempID = NAVStripCharsFromRight(remove_string(cTemp, ';', 1), 1)
+                        select {
+                            active (cAttribute == 'QPW'): {
+                                stack_var integer iTemp
 
-                        if (cTempID != cID) {
-                            iPollSequence = GET_POWER
-                            continue
-                        }
-                    }
+                                iTemp = atoi(cTemp)
 
-                    switch (iCommMode) {
-                        case COMM_MODE_SERIAL:
-                        case COMM_MODE_IP_INDIRECT: {
-                            stack_var char cAttribute[NAV_MAX_CHARS]
-
-                            cAttribute = NAVStripCharsFromRight(remove_string(cTemp, ':', 1), 1)
-
-                            select {
-                                active (cAttribute == 'QPW'): {
-                                    stack_var integer iTemp
-
-                                    iTemp = atoi(cTemp)
-
-                                    switch (iTemp) {
-                                        case false: uDisplay.PowerState.Actual = ACTUAL_POWER_OFF
-                                        case true: uDisplay.PowerState.Actual = ACTUAL_POWER_ON
-                                    }
-
-                                    select {
-                                        active (!iInputInitialized): {
-                                            iPollSequence = GET_INPUT
-                                        }
-                                        active (!iVolumeInitialized): {
-                                            iPollSequence = GET_VOLUME
-                                        }
-                                        active (!iAudioMuteInitialized): {
-                                            iPollSequence = GET_MUTE
-                                        }
-                                    }
+                                switch (iTemp) {
+                                    case false: uDisplay.PowerState.Actual = ACTUAL_POWER_OFF
+                                    case true: uDisplay.PowerState.Actual = ACTUAL_POWER_ON
                                 }
-                                active (cAttribute == 'QMI'): {
-                                    uDisplay.Input.Actual = NAVFindInArraySTRING(INPUT_COMMANDS, cTemp)
-                                    iInputInitialized = true
-                                    iPollSequence = GET_POWER
-                                }
-                                active (cAttribute == 'QAV'): {
-                                    stack_var sinteger siTemp
 
-                                    siTemp = atoi(cTemp)
-
-                                    if (uDisplay.Volume.Level.Actual != siTemp) {
-                                        uDisplay.Volume.Level.Actual = siTemp
-                                        send_level vdvObject,1,uDisplay.Volume.Level.Actual * 255 / MAX_VOLUME
+                                select {
+                                    active (!iInputInitialized): {
+                                        iPollSequence = GET_INPUT
                                     }
-
-                                    iVolumeInitialized = true
-                                    iPollSequence = GET_POWER
-                                }
-                                active (cAttribute == 'QAM'): {
-                                    stack_var integer iTemp
-
-                                    iTemp = atoi(cTemp)
-
-                                    switch (iTemp) {
-                                        case false: uDisplay.Volume.Mute.Actual = ACTUAL_MUTE_OFF
-                                        case true: uDisplay.Volume.Mute.Actual = ACTUAL_MUTE_ON
+                                    active (!iVolumeInitialized): {
+                                        iPollSequence = GET_VOLUME
                                     }
-
-                                    iAudioMuteInitialized = true
-                                    iPollSequence = GET_POWER
+                                    active (!iAudioMuteInitialized): {
+                                        iPollSequence = GET_MUTE
+                                    }
                                 }
                             }
+                            active (cAttribute == 'QMI'): {
+                                uDisplay.Input.Actual = NAVFindInArraySTRING(INPUT_COMMANDS, cTemp)
+                                iInputInitialized = true
+                                iPollSequence = GET_POWER
+                            }
+                            active (cAttribute == 'QAV'): {
+                                stack_var sinteger siTemp
+
+                                siTemp = atoi(cTemp)
+
+                                if (uDisplay.Volume.Level.Actual != siTemp) {
+                                    uDisplay.Volume.Level.Actual = siTemp
+                                    send_level vdvObject, 1, uDisplay.Volume.Level.Actual * 255 / MAX_VOLUME
+                                }
+
+                                iVolumeInitialized = true
+                                iPollSequence = GET_POWER
+                            }
+                            active (cAttribute == 'QAM'): {
+                                stack_var integer iTemp
+
+                                iTemp = atoi(cTemp)
+
+                                switch (iTemp) {
+                                    case false: uDisplay.Volume.Mute.Actual = ACTUAL_MUTE_OFF
+                                    case true: uDisplay.Volume.Mute.Actual = ACTUAL_MUTE_ON
+                                }
+
+                                iAudioMuteInitialized = true
+                                iPollSequence = GET_POWER
+                            }
                         }
-                        case COMM_MODE_IP_DIRECT: {
-                            select {
-                                active (NAVContains(cTemp, 'IMS') > 0): {
-                                    //Input Switch Ack
-                                }
-                                active (NAVContains(cTemp, 'AVL') > 0): {
-                                    //Volume Change Ack
-                                }
-                                active (NAVContains(cTemp, 'DGE') > 0): {
-                                    //Auto Setup Ack
-                                }
-                                active (NAVContains(cTemp, 'OSP') > 0): {
-                                    //OSD Ack
-                                }
-                                active (NAVContains(cTemp, 'VMT') > 0): {
-                                    //Video Mute Ack
-                                }
-                                active (NAVContains(cTemp, 'AMT') > 0): {
-                                    //Audio Mute Ack
-                                }
-                                active (NAVContains(cTemp, 'PON') > 0): {
-                                    //Power On Ack
-                                }
-                                active (NAVContains(cTemp, 'POF') > 0): {
-                                    //Power Off Ack
-                                }
-                                active (NAVContains(cTemp, 'UD1') > 0): {
-                                    //???
-                                }
-                                active (true): {
-                                    switch (iPollSequence) {
-                                        case GET_POWER: {
-                                            if (length_array(cTemp) = 1) {
-                                                switch (atoi(cTemp)) {
-                                                    case 0: { uDisplay.PowerState.Actual = ACTUAL_POWER_OFF; }    //Power Off
-                                                    case 1: {
-                                                        uDisplay.PowerState.Actual = ACTUAL_POWER_ON;    //Power On
-                                                        select {
-                                                            active (!iInputInitialized): { iPollSequence = GET_INPUT; }
-                                                            active (!iAudioMuteInitialized): { iPollSequence = GET_MUTE; }
-                                                            active (!iVolumeInitialized): { iPollSequence = GET_VOLUME; }
-                                                            active (1): { iPollSequence = GET_INPUT; }
-                                                        }
+                    }
+                    case COMM_MODE_IP_DIRECT: {
+                        select {
+                            active (NAVContains(cTemp, 'IMS') > 0): {
+                                //Input Switch Ack
+                            }
+                            active (NAVContains(cTemp, 'AVL') > 0): {
+                                //Volume Change Ack
+                            }
+                            active (NAVContains(cTemp, 'DGE') > 0): {
+                                //Auto Setup Ack
+                            }
+                            active (NAVContains(cTemp, 'OSP') > 0): {
+                                //OSD Ack
+                            }
+                            active (NAVContains(cTemp, 'VMT') > 0): {
+                                //Video Mute Ack
+                            }
+                            active (NAVContains(cTemp, 'AMT') > 0): {
+                                //Audio Mute Ack
+                            }
+                            active (NAVContains(cTemp, 'PON') > 0): {
+                                //Power On Ack
+                            }
+                            active (NAVContains(cTemp, 'POF') > 0): {
+                                //Power Off Ack
+                            }
+                            active (NAVContains(cTemp, 'UD1') > 0): {
+                                //???
+                            }
+                            active (true): {
+                                switch (iPollSequence) {
+                                    case GET_POWER: {
+                                        if (length_array(cTemp) = 1) {
+                                            switch (atoi(cTemp)) {
+                                                case 0: { uDisplay.PowerState.Actual = ACTUAL_POWER_OFF; }    //Power Off
+                                                case 1: {
+                                                    uDisplay.PowerState.Actual = ACTUAL_POWER_ON;    //Power On
+                                                    select {
+                                                        active (!iInputInitialized): { iPollSequence = GET_INPUT; }
+                                                        active (!iAudioMuteInitialized): { iPollSequence = GET_MUTE; }
+                                                        active (!iVolumeInitialized): { iPollSequence = GET_VOLUME; }
+                                                        active (true): { iPollSequence = GET_INPUT; }
                                                     }
                                                 }
                                             }
                                         }
-                                        case GET_MUTE: {
-                                            stack_var integer iTemp
+                                    }
+                                    case GET_MUTE: {
+                                        stack_var integer iTemp
 
-                                            if (length_array(cTemp) = 1) {
-                                                iTemp = atoi(cTemp);
+                                        if (length_array(cTemp) = 1) {
+                                            iTemp = atoi(cTemp);
 
-                                                switch (iTemp) {
-                                                    case 0: { uDisplay.Volume.Mute.Actual = ACTUAL_MUTE_OFF; }
-                                                    case 1: { uDisplay.Volume.Mute.Actual = ACTUAL_MUTE_ON; }
-                                                }
-
-                                                iAudioMuteInitialized = 1;
-                                                iPollSequence = GET_POWER;
-                                            }
-                                        }
-                                        case GET_VOLUME: {
-                                            stack_var sinteger siTemp
-
-                                            siTemp = atoi(cTemp);
-
-                                            if (siTemp != uDisplay.Volume.Level.Actual) {
-                                                uDisplay.Volume.Level.Actual = siTemp;
-                                                send_level vdvObject,1,uDisplay.Volume.Level.Actual * 255 / MAX_VOLUME
+                                            switch (iTemp) {
+                                                case 0: { uDisplay.Volume.Mute.Actual = ACTUAL_MUTE_OFF; }
+                                                case 1: { uDisplay.Volume.Mute.Actual = ACTUAL_MUTE_ON; }
                                             }
 
-                                            iVolumeInitialized = 1;
+                                            iAudioMuteInitialized = 1;
                                             iPollSequence = GET_POWER;
                                         }
-                                        case GET_INPUT: {
-                                            uDisplay.Input.Actual = NAVFindInArraySTRING(INPUT_COMMANDS, cTemp)
-                                            iInputInitialized = true
-                                            iPollSequence = GET_POWER
+                                    }
+                                    case GET_VOLUME: {
+                                        stack_var sinteger siTemp
+
+                                        siTemp = atoi(cTemp);
+
+                                        if (siTemp != uDisplay.Volume.Level.Actual) {
+                                            uDisplay.Volume.Level.Actual = siTemp;
+                                            send_level vdvObject, 1, uDisplay.Volume.Level.Actual * 255 / MAX_VOLUME
                                         }
+
+                                        iVolumeInitialized = 1;
+                                        iPollSequence = GET_POWER;
+                                    }
+                                    case GET_INPUT: {
+                                        uDisplay.Input.Actual = NAVFindInArraySTRING(INPUT_COMMANDS, cTemp)
+                                        iInputInitialized = true
+                                        iPollSequence = GET_POWER
                                     }
                                 }
                             }
@@ -595,7 +598,7 @@ define_function Drive() {
                 return
             }
 
-            // if (siRequiredVolume >= 0) {// && (uDisplay.PowerState.Actual == ACTUAL_POWER_ON)) {// && [vdvControl,DEVICE_COMMUNICATING]) {
+            // if (siRequiredVolume >= 0) {// && (uDisplay.PowerState.Actual == ACTUAL_POWER_ON)) {// && [vdvObject, DEVICE_COMMUNICATING]) {
             //     iCommandBusy = true
             //     SetVolume(siRequiredVolume);
             //     siRequiredVolume = -1
@@ -611,9 +614,11 @@ define_function Drive() {
 
 
 define_function MaintainIPConnection() {
-    if (!uIPConnection.IsConnected) {
-        NAVClientSocketOpen(dvPortIP.port, uIPConnection.Address, uIPConnection.Port, IP_TCP)
+    if (uIPConnection.IsConnected) {
+        return
     }
+
+    NAVClientSocketOpen(dvPortIP.port, uIPConnection.Address, uIPConnection.Port, IP_TCP)
 }
 
 
@@ -621,9 +626,9 @@ define_function MaintainIPConnection() {
 (*                STARTUP CODE GOES BELOW                  *)
 (***********************************************************)
 DEFINE_START {
-    create_buffer dvPortRS232,cRxBuffer[COMM_MODE_SERIAL]
-    create_buffer dvPortIP,cRxBuffer[COMM_MODE_IP_DIRECT]
-    create_buffer dvPortIP,cRxBuffer[COMM_MODE_IP_INDIRECT]
+    create_buffer dvPortRS232, cRxBuffer[COMM_MODE_SERIAL]
+    create_buffer dvPortIP, cRxBuffer[COMM_MODE_IP_DIRECT]
+    create_buffer dvPortIP, cRxBuffer[COMM_MODE_IP_INDIRECT]
 
     uIPConnection.Port = DEFAULT_TCP_PORT
 
@@ -640,11 +645,11 @@ DEFINE_EVENT
 
 data_event[dvPortRS232] {
     online: {
-        NAVCommand(data.device,"'SET BAUD ', cBaudRate, ',N,8,1 485 DISABLE'")
-        NAVCommand(data.device,"'B9MOFF'")
-        NAVCommand(data.device,"'CHARD-0'")
-        NAVCommand(data.device,"'CHARDM-0'")
-        NAVCommand(data.device,"'HSOFF'")
+        NAVCommand(data.device, "'SET BAUD ', cBaudRate, ', N, 8, 1 485 DISABLE'")
+        NAVCommand(data.device, "'B9MOFF'")
+        NAVCommand(data.device, "'CHARD-0'")
+        NAVCommand(data.device, "'CHARDM-0'")
+        NAVCommand(data.device, "'HSOFF'")
 
         if (!timeline_active(TL_DRIVE)) {
             timeline_create(TL_DRIVE, ltDrive, length_array(ltDrive), TIMELINE_ABSOLUTE, TIMELINE_REPEAT)
@@ -656,7 +661,7 @@ data_event[dvPortRS232] {
 
         TimeOut()
 
-        NAVLog("'String From ', NAVConvertDPSToAscii(dvaCommObjects[iCommMode]), '-[', data.text, ']'")
+        NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'String From ', NAVConvertDPSToAscii(dvaCommObjects[iCommMode]), '-[', data.text, ']'")
 
         if (!iSemaphore) { Process() }
     }
@@ -670,7 +675,7 @@ data_event[dvPortIP] {
 
             iCommMode = iCommModeIP
 
-            // NAVLog("'PANASONIC_PLASMA_IP_ONLINE<',NAVStringSurroundWith(NAVDeviceToString(dvPortIP), '[', ']'),'>'")
+            // NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'PANASONIC_PLASMA_IP_ONLINE<', NAVStringSurroundWith(NAVDeviceToString(dvPortIP), '[', ']'), '>'")
         }
 
         if (!timeline_active(TL_DRIVE)) {
@@ -683,7 +688,7 @@ data_event[dvPortIP] {
 
         TimeOut()
 
-        NAVLog("'String From ', NAVConvertDPSToAscii(dvaCommObjects[iCommMode]), '-[', data.text, ']'")
+        NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'String From ', NAVConvertDPSToAscii(dvaCommObjects[iCommMode]), '-[', data.text, ']'")
 
         if (!iSemaphore) { Process() }
     }
@@ -693,7 +698,7 @@ data_event[dvPortIP] {
             NAVClientSocketClose(data.device.port)
             iConnectionStarted = false
             iCommMode = COMM_MODE_SERIAL
-            // NAVLog("'PANASONIC_PLASMA_IP_OFFLINE<',NAVStringSurroundWith(NAVDeviceToString(dvPortIP), '[', ']'),'>'")
+            // NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'PANASONIC_PLASMA_IP_OFFLINE<', NAVStringSurroundWith(NAVDeviceToString(dvPortIP), '[', ']'), '>'")
 
             MaintainIPConnection()
         }
@@ -703,7 +708,7 @@ data_event[dvPortIP] {
             uIPConnection.IsConnected = false
             //NAVClientSocketClose(data.device.port)
             iCommMode = COMM_MODE_SERIAL
-            // NAVLog("'PANASONIC_PLASMA_IP_ONERROR<',NAVStringSurroundWith(NAVDeviceToString(dvPortIP), '[', ']'),'>'")
+            // NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'PANASONIC_PLASMA_IP_ONERROR<', NAVStringSurroundWith(NAVDeviceToString(dvPortIP), '[', ']'), '>'")
         }
     }
 }
@@ -714,7 +719,7 @@ data_event[vdvObject] {
         stack_var char cCmdHeader[NAV_MAX_CHARS]
         stack_var char cCmdParam[3][NAV_MAX_CHARS]
 
-        NAVLog(NAVFormatStandardLogMessage(NAV_STANDARD_LOG_MESSAGE_TYPE_COMMAND_FROM, data.device, data.text))
+        NAVErrorLog(NAV_LOG_LEVEL_DEBUG, NAVFormatStandardLogMessage(NAV_STANDARD_LOG_MESSAGE_TYPE_COMMAND_FROM, data.device, data.text))
 
         cCmdHeader = DuetParseCmdHeader(data.text)
         cCmdParam[1] = DuetParseCmdParam(data.text)
@@ -751,18 +756,21 @@ data_event[vdvObject] {
                     }
                     case 'BAUD_RATE': {
                         cBaudRate = cCmdParam[2]
+
                         if ((iCommMode == COMM_MODE_SERIAL) && device_id(dvaCommObjects[iCommMode])) {
-                            send_command dvaCommObjects[iCommMode],"'SET BAUD ', cBaudRate, ',N,8,1 485 DISABLE'"
+                            send_command dvaCommObjects[iCommMode], "'SET BAUD ', cBaudRate, ', N, 8, 1 485 DISABLE'"
                         }
                     }
                     case 'USER_NAME': {
                         cUserName = cCmdParam[2]
+
                         if (length_array(cMD5RandomNumber)) {
                             cMD5StringToEncode = "cUserName, ':', cPassword, ':', cMD5RandomNumber"
                         }
                     }
                     case 'PASSWORD': {
                         cPassword = cCmdParam[2]
+
                         if (length_array(cMD5RandomNumber)) {
                             cMD5StringToEncode = "cUserName, ':', cPassword, ':', cMD5RandomNumber"
                         }
@@ -841,7 +849,7 @@ data_event[vdvObject] {
 }
 
 
-channel_event[vdvObject,0] {
+channel_event[vdvObject, 0] {
     on: {
         switch (channel.channel) {
             case POWER: {
@@ -860,7 +868,7 @@ channel_event[vdvObject,0] {
             }
             case PWR_ON: { iRequiredPower = REQUIRED_POWER_ON; Drive() }
             case PWR_OFF: { iRequiredPower = REQUIRED_POWER_OFF; iRequiredInput = 0; Drive() }
-            //case PIC_MUTE: { SetShutter(![vdvControl,PIC_MUTE_FB]) }
+            //case PIC_MUTE: { SetShutter(![vdvObject, PIC_MUTE_FB]) }
             case VOL_MUTE: {
                 if (uDisplay.PowerState.Actual == ACTUAL_POWER_ON) {
                     if (iRequiredMute) {
