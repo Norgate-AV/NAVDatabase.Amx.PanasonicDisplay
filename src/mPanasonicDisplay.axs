@@ -8,7 +8,7 @@ MODULE_NAME='mPanasonicDisplay' (
 #include 'NAVFoundation.Math.axi'
 #include 'NAVFoundation.SocketUtils.axi'
 #include 'NAVFoundation.ArrayUtils.axi'
-#include 'md5.axi'
+#include 'NAVFoundation.Cryptography.Md5.axi'
 
 /*
  _   _                       _          ___     __
@@ -216,7 +216,7 @@ define_function SendString(char cmd[]) {
     cPayload = "cPayload, cmd, COMM_MODE_DELIMITER[iCommMode]"
 
     if (iSecureCommandRequired && CommModeIsIP(iCommMode)) {
-        cPayload = "Encrypt(cMD5StringToEncode), cPayload"
+        cPayload = "NAVMd5GetHash(cMD5StringToEncode), cPayload"
     }
 
     SendStringRaw(cPayload)
@@ -229,7 +229,7 @@ define_function PassthruSend(char cmd[]) {
     cPayload = "COMM_MODE_HEADER[iCommMode], cmd, COMM_MODE_DELIMITER[iCommMode]"
 
     if (iSecureCommandRequired && CommModeIsIP(iCommMode)) {
-        cPayload = "Encrypt(cMD5StringToEncode), cPayload"
+        cPayload = "NAVMd5GetHash(cMD5StringToEncode), cPayload"
     }
 
     SendStringRaw(cPayload)
