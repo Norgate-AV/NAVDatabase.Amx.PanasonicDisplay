@@ -702,7 +702,7 @@ data_event[vdvObject] {
                 switch (cCmdParam[1]) {
                     case 'IP_ADDRESS': {
                         uIPConnection.Address = cCmdParam[2]
-                        timeline_create(TL_IP_CLIENT_CHECK, ltIPClientCheck, length_array(ltIPClientCheck), TIMELINE_ABSOLUTE, TIMELINE_REPEAT)
+                        NAVTimelineStart(TL_IP_CLIENT_CHECK, ltIPClientCheck, TIMELINE_ABSOLUTE, TIMELINE_REPEAT)
                     }
                     case 'IP_PORT': {
                         uIPConnection.Port = atoi(cCmdParam[2])
