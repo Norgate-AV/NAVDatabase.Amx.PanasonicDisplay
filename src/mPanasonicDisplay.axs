@@ -1,7 +1,6 @@
 MODULE_NAME='mPanasonicDisplay' (
                                     dev vdvObject,
-                                    dev dvPortRS232,
-                                    dev dvPortIP
+                                    dev dvPort
                                 )
 
 (***********************************************************)
@@ -140,8 +139,6 @@ DEFINE_VARIABLE
 
 volatile _NAVDisplay uDisplay
 
-volatile dev dvaCommObjects[3]
-
 volatile long ltIPClientCheck[] = { 3000 }
 
 volatile integer iLoop
@@ -155,7 +152,7 @@ volatile sinteger siRequiredVolume = -1
 volatile long ltDrive[] = { 200 }
 
 volatile integer iSemaphore
-volatile char cRxBuffer[3][NAV_MAX_BUFFER]
+volatile char cRxBuffer[NAV_MAX_BUFFER]
 
 volatile integer iPowerBusy
 
@@ -202,8 +199,8 @@ DEFINE_MUTUALLY_EXCLUSIVE
 (* EXAMPLE: DEFINE_CALL '<NAME>' (<PARAMETERS>) *)
 
 define_function SendStringRaw(char payload[]) {
-    NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'String To ', NAVConvertDPSToAscii(dvaCommObjects[iCommMode]), '-[', payload, ']'")
-    send_string dvaCommObjects[iCommMode], "payload"
+    NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'String To ', NAVConvertDPSToAscii(dvPort), '-[', payload, ']'")
+    send_string dvPort, "payload"
 }
 
 
@@ -262,7 +259,7 @@ define_function TimeOut() {
 
         if (CommModeIsIP(iCommMode)) {
             //uIPConnection.IsConnected = false
-            NAVClientSocketClose(dvPortIP.PORT)
+            NAVClientSocketClose(dvPort.PORT)
         }
     }
 }
@@ -329,11 +326,11 @@ define_function Process() {
 
     iSemaphore = true
     //NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'Processing String From ', NAVConvertDPSToAscii(dvaCommObjects[iCommMode]), ' in Comm Mode[', itoa(iCommMode), ']', '-[', cRxBuffer[iCommMode], ']'")
-    while (length_array(cRxBuffer[iCommMode]) && NAVContains(cRxBuffer[iCommMode], COMM_MODE_DELIMITER[iCommMode])) {
-        cTemp = remove_string(cRxBuffer[iCommMode], COMM_MODE_DELIMITER[iCommMode], 1)
+    while (length_array(cRxBuffer) && NAVContains(cRxBuffer, COMM_MODE_DELIMITER[iCommMode])) {
+        cTemp = remove_string(cRxBuffer, COMM_MODE_DELIMITER[iCommMode], 1)
 
         if (iCommModeIP == COMM_MODE_IP_DIRECT && iConnectionStarted) {
-            NAVClientSocketClose(dvPortIP.PORT)
+            NAVClientSocketClose(dvPort.PORT)
             //MaintainIPConnection()
         }
 
@@ -341,7 +338,7 @@ define_function Process() {
             continue
         }
 
-        NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'Parsing String From ', NAVConvertDPSToAscii(dvaCommObjects[iCommMode]), ' in Comm Mode[', GetCommMode(iCommMode), ']', '-[', cTemp, ']'")
+        NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'Parsing String From ', NAVConvertDPSToAscii(dvPort), ' in Comm Mode[', GetCommMode(iCommMode), ']', '-[', cTemp, ']'")
 
         cTemp = NAVStripCharsFromRight(cTemp, 1)    //Remove delimiter
 
@@ -618,7 +615,7 @@ define_function MaintainIPConnection() {
         return
     }
 
-    NAVClientSocketOpen(dvPortIP.port, uIPConnection.Address, uIPConnection.Port, IP_TCP)
+    NAVClientSocketOpen(dvPort.PORT, uIPConnection.Address, uIPConnection.Port, IP_TCP)
 }
 
 
@@ -626,16 +623,9 @@ define_function MaintainIPConnection() {
 (*                STARTUP CODE GOES BELOW                  *)
 (***********************************************************)
 DEFINE_START {
-    create_buffer dvPortRS232, cRxBuffer[COMM_MODE_SERIAL]
-    create_buffer dvPortIP, cRxBuffer[COMM_MODE_IP_DIRECT]
-    create_buffer dvPortIP, cRxBuffer[COMM_MODE_IP_INDIRECT]
+    create_buffer dvPort, cRxBuffer
 
     uIPConnection.Port = DEFAULT_TCP_PORT
-
-    dvaCommObjects[1] = dvPortRS232
-    dvaCommObjects[2] = dvPortIP
-    dvaCommObjects[3] = dvPortIP
-
 }
 
 (***********************************************************)
@@ -643,44 +633,25 @@ DEFINE_START {
 (***********************************************************)
 DEFINE_EVENT
 
-data_event[dvPortRS232] {
+data_event[dvPort] {
     online: {
-        NAVCommand(data.device, "'SET BAUD ', cBaudRate, ', N, 8, 1 485 DISABLE'")
-        NAVCommand(data.device, "'B9MOFF'")
-        NAVCommand(data.device, "'CHARD-0'")
-        NAVCommand(data.device, "'CHARDM-0'")
-        NAVCommand(data.device, "'HSOFF'")
-
-        if (!timeline_active(TL_DRIVE)) {
-            timeline_create(TL_DRIVE, ltDrive, length_array(ltDrive), TIMELINE_ABSOLUTE, TIMELINE_REPEAT)
+        if (data.device.number != 0) {
+            NAVCommand(data.device, "'SET BAUD ', cBaudRate, ', N, 8, 1 485 DISABLE'")
+            NAVCommand(data.device, "'B9MOFF'")
+            NAVCommand(data.device, "'CHARD-0'")
+            NAVCommand(data.device, "'CHARDM-0'")
+            NAVCommand(data.device, "'HSOFF'")
         }
-    }
-    string: {
-        [vdvObject, DEVICE_COMMUNICATING] = true
-        [vdvObject, DATA_INITIALIZED] = true
 
-        TimeOut()
-
-        NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'String From ', NAVConvertDPSToAscii(dvaCommObjects[iCommMode]), '-[', data.text, ']'")
-
-        if (!iSemaphore) { Process() }
-    }
-}
-
-
-data_event[dvPortIP] {
-    online: {
         if (data.device.number == 0) {
             uIPConnection.IsConnected = true
 
-            iCommMode = iCommModeIP
+            // iCommMode = iCommModeIP
 
             // NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'PANASONIC_PLASMA_IP_ONLINE<', NAVStringSurroundWith(NAVDeviceToString(dvPortIP), '[', ']'), '>'")
         }
 
-        if (!timeline_active(TL_DRIVE)) {
-            timeline_create(TL_DRIVE, ltDrive, length_array(ltDrive), TIMELINE_ABSOLUTE, TIMELINE_REPEAT)
-        }
+        NAVTimelineStart(TL_DRIVE, ltDrive, TIMELINE_ABSOLUTE, TIMELINE_REPEAT)
     }
     string: {
         [vdvObject, DEVICE_COMMUNICATING] = true
@@ -688,7 +659,7 @@ data_event[dvPortIP] {
 
         TimeOut()
 
-        NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'String From ', NAVConvertDPSToAscii(dvaCommObjects[iCommMode]), '-[', data.text, ']'")
+        NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'String From ', NAVConvertDPSToAscii(data.device), '-[', data.text, ']'")
 
         if (!iSemaphore) { Process() }
     }
@@ -697,7 +668,7 @@ data_event[dvPortIP] {
             uIPConnection.IsConnected = false
             NAVClientSocketClose(data.device.port)
             iConnectionStarted = false
-            iCommMode = COMM_MODE_SERIAL
+            // iCommMode = COMM_MODE_SERIAL
             // NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'PANASONIC_PLASMA_IP_OFFLINE<', NAVStringSurroundWith(NAVDeviceToString(dvPortIP), '[', ']'), '>'")
 
             MaintainIPConnection()
@@ -707,7 +678,7 @@ data_event[dvPortIP] {
         if (data.device.number == 0) {
             uIPConnection.IsConnected = false
             //NAVClientSocketClose(data.device.port)
-            iCommMode = COMM_MODE_SERIAL
+            // iCommMode = COMM_MODE_SERIAL
             // NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'PANASONIC_PLASMA_IP_ONERROR<', NAVStringSurroundWith(NAVDeviceToString(dvPortIP), '[', ']'), '>'")
         }
     }
@@ -757,8 +728,8 @@ data_event[vdvObject] {
                     case 'BAUD_RATE': {
                         cBaudRate = cCmdParam[2]
 
-                        if ((iCommMode == COMM_MODE_SERIAL) && device_id(dvaCommObjects[iCommMode])) {
-                            send_command dvaCommObjects[iCommMode], "'SET BAUD ', cBaudRate, ', N, 8, 1 485 DISABLE'"
+                        if ((iCommMode == COMM_MODE_SERIAL) && device_id(dvPort)) {
+                            send_command dvPort, "'SET BAUD ', cBaudRate, ', N, 8, 1 485 DISABLE'"
                         }
                     }
                     case 'USER_NAME': {
