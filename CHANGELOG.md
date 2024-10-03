@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.1](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/compare/v2.0.0...v2.0.1) (2024-10-03)
+
+### 🐛 Bug Fixes
+
+-   ensure correct file globs are added to manifest ([70eddfc](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/commit/70eddfceb5c0bf3ba8d9fd082aab44974b252ab6))
+
 ## [2.0.0](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/compare/v1.0.0...v2.0.0) (2024-10-03)
 
 ### ⚠ BREAKING CHANGES
