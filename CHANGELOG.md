@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.0.0](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/compare/v1.0.0...v2.0.0) (2024-10-03)
+
+### ⚠ BREAKING CHANGES
+
+-   remove support for IP/RS232 failover
+
+### 🐛 Bug Fixes
+
+-   fix release scripts ([4b60840](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/commit/4b60840b5f4201a71ba9934bb831aa1920e28765))
+
+### ✨ Refactor
+
+-   remove support for IP/RS232 failover ([f2e125c](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/commit/f2e125cd440c56a8a274fbff71fc32156838e5b9))
+
 ## 1.0.0 (2024-03-10)
 
 ### 🌟 Features
