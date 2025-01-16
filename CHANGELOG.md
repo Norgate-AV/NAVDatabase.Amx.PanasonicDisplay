@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.3](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/compare/v2.0.2...v2.0.3) (2025-01-16)
+
+### 🐛 Bug Fixes
+
+- fix path update in install script ([e1d1e9c](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/commit/e1d1e9cba318398c8249b2866edac74d15e30206))
+
 ## [2.0.2](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/compare/v2.0.1...v2.0.2) (2025-01-16)
 
 ### 🐛 Bug Fixes
