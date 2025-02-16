@@ -199,7 +199,10 @@ DEFINE_MUTUALLY_EXCLUSIVE
 (* EXAMPLE: DEFINE_CALL '<NAME>' (<PARAMETERS>) *)
 
 define_function SendStringRaw(char payload[]) {
-    NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'String To ', NAVConvertDPSToAscii(dvPort), '-[', payload, ']'")
+    if (dvPort.NUMBER == 0) {
+        NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'String To ', NAVConvertDPSToAscii(dvPort), '-[', payload, ']'")
+    }
+
     send_string dvPort, "payload"
 }
 
@@ -325,7 +328,6 @@ define_function Process() {
     }
 
     iSemaphore = true
-    //NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'Processing String From ', NAVConvertDPSToAscii(dvaCommObjects[iCommMode]), ' in Comm Mode[', itoa(iCommMode), ']', '-[', cRxBuffer[iCommMode], ']'")
     while (length_array(cRxBuffer) && NAVContains(cRxBuffer, COMM_MODE_DELIMITER[iCommMode])) {
         cTemp = remove_string(cRxBuffer, COMM_MODE_DELIMITER[iCommMode], 1)
 
@@ -338,7 +340,9 @@ define_function Process() {
             continue
         }
 
-        NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'Parsing String From ', NAVConvertDPSToAscii(dvPort), ' in Comm Mode[', GetCommMode(iCommMode), ']', '-[', cTemp, ']'")
+        if (dvPort.NUMBER == 0) {
+            NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'Parsing String From ', NAVConvertDPSToAscii(dvPort), ' in Comm Mode[', GetCommMode(iCommMode), ']', '-[', cTemp, ']'")
+        }
 
         cTemp = NAVStripCharsFromRight(cTemp, 1)    //Remove delimiter
 
@@ -659,7 +663,9 @@ data_event[dvPort] {
 
         TimeOut()
 
-        NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'String From ', NAVConvertDPSToAscii(data.device), '-[', data.text, ']'")
+        if (data.device.number == 0) {
+            NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'String From ', NAVConvertDPSToAscii(data.device), '-[', data.text, ']'")
+        }
 
         if (!iSemaphore) { Process() }
     }
@@ -689,8 +695,6 @@ data_event[vdvObject] {
     command: {
         stack_var char cCmdHeader[NAV_MAX_CHARS]
         stack_var char cCmdParam[3][NAV_MAX_CHARS]
-
-        NAVErrorLog(NAV_LOG_LEVEL_DEBUG, NAVFormatStandardLogMessage(NAV_STANDARD_LOG_MESSAGE_TYPE_COMMAND_FROM, data.device, data.text))
 
         cCmdHeader = DuetParseCmdHeader(data.text)
         cCmdParam[1] = DuetParseCmdParam(data.text)
