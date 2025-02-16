@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.4](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/compare/v2.0.3...v2.0.4) (2025-02-16)
+
+### 🚀 Performance
+
+- move timeline arrays to constant ([c27ba7e](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/commit/c27ba7e0d2e1b845783e9cc99d29e3b0bf91dc0d))
+- remove unnecessary logging ([40bdaa3](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/commit/40bdaa3d54f06690e0d67ecc50392f1c8199bdb3))
+
 ## [2.0.3](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/compare/v2.0.2...v2.0.3) (2025-01-16)
 
 ### 🐛 Bug Fixes
