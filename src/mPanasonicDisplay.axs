@@ -54,6 +54,9 @@ DEFINE_CONSTANT
 constant long TL_DRIVE    = 1
 constant long TL_IP_CLIENT_CHECK = 2
 
+constant long TL_DRIVE_INTERVAL[] = { 200 }
+constant long TL_IP_CLIENT_CHECK_INTERVAL[] = { 3000 }
+
 constant integer REQUIRED_POWER_ON    = 1
 constant integer REQUIRED_POWER_OFF    = 2
 
@@ -139,8 +142,6 @@ DEFINE_VARIABLE
 
 volatile _NAVDisplay uDisplay
 
-volatile long ltIPClientCheck[] = { 3000 }
-
 volatile integer iLoop
 volatile integer iPollSequence = GET_POWER
 
@@ -148,8 +149,6 @@ volatile integer iRequiredPower
 volatile integer iRequiredInput
 volatile integer iRequiredMute
 volatile sinteger siRequiredVolume = -1
-
-volatile long ltDrive[] = { 200 }
 
 volatile integer iSemaphore
 volatile char cRxBuffer[NAV_MAX_BUFFER]
@@ -655,7 +654,7 @@ data_event[dvPort] {
             // NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'PANASONIC_PLASMA_IP_ONLINE<', NAVStringSurroundWith(NAVDeviceToString(dvPortIP), '[', ']'), '>'")
         }
 
-        NAVTimelineStart(TL_DRIVE, ltDrive, TIMELINE_ABSOLUTE, TIMELINE_REPEAT)
+        NAVTimelineStart(TL_DRIVE, TL_DRIVE_INTERVAL, TIMELINE_ABSOLUTE, TIMELINE_REPEAT)
     }
     string: {
         [vdvObject, DEVICE_COMMUNICATING] = true
@@ -706,7 +705,7 @@ data_event[vdvObject] {
                 switch (cCmdParam[1]) {
                     case 'IP_ADDRESS': {
                         uIPConnection.Address = cCmdParam[2]
-                        NAVTimelineStart(TL_IP_CLIENT_CHECK, ltIPClientCheck, TIMELINE_ABSOLUTE, TIMELINE_REPEAT)
+                        NAVTimelineStart(TL_IP_CLIENT_CHECK, TL_IP_CLIENT_CHECK_INTERVAL, TIMELINE_ABSOLUTE, TIMELINE_REPEAT)
                     }
                     case 'IP_PORT': {
                         uIPConnection.Port = atoi(cCmdParam[2])
