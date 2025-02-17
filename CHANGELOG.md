@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.1.0](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/compare/v2.0.4...v2.1.0) (2025-02-17)
+
+### 🌟 Features
+
+- bump NAVFoundation.Amx to 1.27.0 ([151231e](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/commit/151231e80d75c4a71d29bf9072bfd7fcf9a25648))
+
 ## [2.0.4](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/compare/v2.0.3...v2.0.4) (2025-02-16)
 
 ### 🚀 Performance
