@@ -8,6 +8,9 @@ MODULE_NAME='mPanasonicDisplay' (
 #include 'NAVFoundation.Math.axi'
 #include 'NAVFoundation.SocketUtils.axi'
 #include 'NAVFoundation.ArrayUtils.axi'
+#include 'NAVFoundation.TimelineUtils.axi'
+#include 'NAVFoundation.ErrorLogUtils.axi'
+#include 'NAVFoundation.Encoding.axi'
 #include 'NAVFoundation.Cryptography.Md5.axi'
 
 /*
@@ -218,7 +221,7 @@ define_function SendString(char cmd[]) {
     cPayload = "cPayload, cmd, COMM_MODE_DELIMITER[iCommMode]"
 
     if (iSecureCommandRequired && CommModeIsIP(iCommMode)) {
-        cPayload = "NAVMd5GetHash(cMD5StringToEncode), cPayload"
+        cPayload = "NAVHexToString(NAVMd5GetHash(cMD5StringToEncode)), cPayload"
     }
 
     SendStringRaw(cPayload)
@@ -231,7 +234,7 @@ define_function PassthruSend(char cmd[]) {
     cPayload = "COMM_MODE_HEADER[iCommMode], cmd, COMM_MODE_DELIMITER[iCommMode]"
 
     if (iSecureCommandRequired && CommModeIsIP(iCommMode)) {
-        cPayload = "NAVMd5GetHash(cMD5StringToEncode), cPayload"
+        cPayload = "NAVHexToString(NAVMd5GetHash(cMD5StringToEncode)), cPayload"
     }
 
     SendStringRaw(cPayload)
@@ -404,6 +407,8 @@ define_function Process() {
                                     case true: uDisplay.PowerState.Actual = ACTUAL_POWER_ON
                                 }
 
+                                UpdateFeedback()
+
                                 select {
                                     active (!iInputInitialized): {
                                         iPollSequence = GET_INPUT
@@ -443,6 +448,8 @@ define_function Process() {
                                     case false: uDisplay.Volume.Mute.Actual = ACTUAL_MUTE_OFF
                                     case true: uDisplay.Volume.Mute.Actual = ACTUAL_MUTE_ON
                                 }
+
+                                UpdateFeedback()
 
                                 iAudioMuteInitialized = true
                                 iPollSequence = GET_POWER
@@ -494,6 +501,8 @@ define_function Process() {
                                                     }
                                                 }
                                             }
+
+                                            UpdateFeedback()
                                         }
                                     }
                                     case GET_MUTE: {
@@ -506,6 +515,8 @@ define_function Process() {
                                                 case 0: { uDisplay.Volume.Mute.Actual = ACTUAL_MUTE_OFF; }
                                                 case 1: { uDisplay.Volume.Mute.Actual = ACTUAL_MUTE_ON; }
                                             }
+
+                                            UpdateFeedback()
 
                                             iAudioMuteInitialized = 1;
                                             iPollSequence = GET_POWER;
@@ -619,6 +630,12 @@ define_function MaintainIPConnection() {
     }
 
     NAVClientSocketOpen(dvPort.PORT, uIPConnection.Address, uIPConnection.Port, IP_TCP)
+}
+
+
+define_function UpdateFeedback() {
+    [vdvObject, VOL_MUTE_FB] = (uDisplay.Volume.Mute.Actual == ACTUAL_MUTE_ON)
+    [vdvObject, POWER_FB] = (uDisplay.PowerState.Actual == ACTUAL_POWER_ON)
 }
 
 
@@ -868,12 +885,6 @@ timeline_event[TL_DRIVE] { Drive() }
 
 
 timeline_event[TL_IP_CLIENT_CHECK] { MaintainIPConnection() }
-
-
-timeline_event[TL_NAV_FEEDBACK] {
-    [vdvObject, VOL_MUTE_FB] = (uDisplay.Volume.Mute.Actual == ACTUAL_MUTE_ON)
-    [vdvObject, POWER_FB] = (uDisplay.PowerState.Actual == ACTUAL_POWER_ON)
-}
 
 
 (***********************************************************)
