@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.3.0](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/compare/v2.2.0...v2.3.0) (2025-06-11)
+
+### 🌟 Features
+
+- add support for USB inputs ([30b36da](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/commit/30b36da27db3f3e368dc9ac5d60e8defe3529175))
+
 ## [2.2.0](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/compare/v2.1.0...v2.2.0) (2025-03-12)
 
 ### 🌟 Features
