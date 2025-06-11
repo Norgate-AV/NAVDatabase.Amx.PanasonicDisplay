@@ -79,6 +79,10 @@ constant integer REQUIRED_INPUT_DVI_1    = 10
 constant integer REQUIRED_INPUT_HDMI_2    = 11
 constant integer REQUIRED_INPUT_HDMI_3    = 12
 constant integer REQUIRED_INPUT_HDMI_4    = 13
+constant integer REQUIRED_INPUT_USB_1    = 14
+constant integer REQUIRED_INPUT_USB_2    = 15
+constant integer REQUIRED_INPUT_USB_3    = 16
+constant integer REQUIRED_INPUT_USB_4    = 17
 
 constant integer ACTUAL_INPUT_SLOT_1    = 1
 constant integer ACTUAL_INPUT_SLOT_1A    = 2
@@ -93,6 +97,10 @@ constant integer ACTUAL_INPUT_DVI_1    = 10
 constant integer ACTUAL_INPUT_HDMI_2    = 11
 constant integer ACTUAL_INPUT_HDMI_3    = 12
 constant integer ACTUAL_INPUT_HDMI_4    = 13
+constant integer ACTUAL_INPUT_USB_1    = 14
+constant integer ACTUAL_INPUT_USB_2    = 15
+constant integer ACTUAL_INPUT_USB_3    = 16
+constant integer ACTUAL_INPUT_USB_4    = 17
 
 constant char INPUT_COMMANDS[][NAV_MAX_CHARS]   =   {
                                                         'SL1',
@@ -107,7 +115,11 @@ constant char INPUT_COMMANDS[][NAV_MAX_CHARS]   =   {
                                                         'DV1',
                                                         'HM2',
                                                         'HM3',
-                                                        'HM4'
+                                                        'HM4',
+                                                        'UD1',
+                                                        'UD2',
+                                                        'UD3',
+                                                        'UD4'
                                                     }
 
 constant integer GET_POWER  = 1
@@ -826,6 +838,14 @@ data_event[vdvObject] {
                             case '2': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_HDMI_2; Drive() }
                             case '3': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_HDMI_3; Drive() }
                             case '4': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_HDMI_4; Drive() }
+                        }
+                    }
+                    case 'USB': {
+                        switch (cCmdParam[2]) {
+                            case '1': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_USB_1; Drive() }
+                            case '2': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_USB_2; Drive() }
+                            case '3': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_USB_3; Drive() }
+                            case '4': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_USB_4; Drive() }
                         }
                     }
                     case 'DVI': {
