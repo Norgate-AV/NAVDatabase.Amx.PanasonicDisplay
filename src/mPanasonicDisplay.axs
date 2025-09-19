@@ -4,7 +4,7 @@ MODULE_NAME='mPanasonicDisplay' (
                                 )
 
 (***********************************************************)
-#include 'NAVFoundation.ModuleBase.axi'
+#include 'NAVFoundation.SnapiHelpers.axi'
 #include 'NAVFoundation.Math.axi'
 #include 'NAVFoundation.SocketUtils.axi'
 #include 'NAVFoundation.ArrayUtils.axi'
@@ -155,6 +155,7 @@ DEFINE_TYPE
 (***********************************************************)
 DEFINE_VARIABLE
 
+// volatile _NAVModule module
 volatile _NAVDisplay uDisplay
 
 volatile integer iLoop
