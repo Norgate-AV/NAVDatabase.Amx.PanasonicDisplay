@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.5.0](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/compare/v2.4.0...v2.5.0) (2025-09-20)
+
+### 🌟 Features
+
+- clean up module. implement queuing. ([9390a0e](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/commit/9390a0e698f7e636b4d51f304eb7b6394419cb8c))
+
 ## [2.4.0](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/compare/v2.3.0...v2.4.0) (2025-09-19)
 
 ### 🌟 Features
