@@ -4,12 +4,22 @@ MODULE_NAME='mPanasonicDisplay' (
                                 )
 
 (***********************************************************)
+#DEFINE USING_NAV_MODULE_BASE_CALLBACKS
+#DEFINE USING_NAV_MODULE_BASE_PROPERTY_EVENT_CALLBACK
+#DEFINE USING_NAV_MODULE_BASE_PASSTHRU_EVENT_CALLBACK
+#DEFINE USING_NAV_STRING_GATHER_CALLBACK
+#DEFINE USING_NAV_LOGIC_ENGINE_EVENT_CALLBACK
+#DEFINE USING_NAV_DEVICE_PRIORITY_QUEUE_SEND_NEXT_ITEM_EVENT_CALLBACK
+#DEFINE USING_NAV_DEVICE_PRIORITY_QUEUE_FAILED_RESPONSE_EVENT_CALLBACK
+#include 'NAVFoundation.LogicEngine.axi'
+#include 'NAVFoundation.ModuleBase.axi'
 #include 'NAVFoundation.SnapiHelpers.axi'
 #include 'NAVFoundation.Math.axi'
 #include 'NAVFoundation.SocketUtils.axi'
 #include 'NAVFoundation.ArrayUtils.axi'
 #include 'NAVFoundation.TimelineUtils.axi'
 #include 'NAVFoundation.ErrorLogUtils.axi'
+#include 'NAVFoundation.DevicePriorityQueue.axi'
 #include 'NAVFoundation.Encoding.axi'
 #include 'NAVFoundation.Cryptography.Md5.axi'
 
@@ -54,53 +64,54 @@ DEFINE_DEVICE
 (***********************************************************)
 DEFINE_CONSTANT
 
-constant long TL_DRIVE    = 1
-constant long TL_IP_CLIENT_CHECK = 2
+constant long TL_SOCKET_CHECK               = 1
 
-constant long TL_DRIVE_INTERVAL[] = { 200 }
-constant long TL_IP_CLIENT_CHECK_INTERVAL[] = { 3000 }
+constant long TL_SOCKET_CHECK_INTERVAL[]    = { 3000 }
 
-constant integer REQUIRED_POWER_ON    = 1
-constant integer REQUIRED_POWER_OFF    = 2
+constant integer REQUIRED_POWER_ON          = 1
+constant integer REQUIRED_POWER_OFF         = 2
 
-constant integer ACTUAL_POWER_ON    = 1
-constant integer ACTUAL_POWER_OFF    = 2
+constant integer ACTUAL_POWER_ON            = 1
+constant integer ACTUAL_POWER_OFF           = 2
 
-constant integer REQUIRED_INPUT_SLOT_1    = 1
-constant integer REQUIRED_INPUT_SLOT_1A    = 2
-constant integer REQUIRED_INPUT_SLOT_1B    = 3
-constant integer REQUIRED_INPUT_SLOT_2    = 4
-constant integer REQUIRED_INPUT_SLOT_2A    = 5
-constant integer REQUIRED_INPUT_SLOT_2B    = 6
-constant integer REQUIRED_INPUT_SLOT_3    = 7
-constant integer REQUIRED_INPUT_PC_1    = 8
-constant integer REQUIRED_INPUT_HDMI_1    = 9
-constant integer REQUIRED_INPUT_DVI_1    = 10
-constant integer REQUIRED_INPUT_HDMI_2    = 11
-constant integer REQUIRED_INPUT_HDMI_3    = 12
-constant integer REQUIRED_INPUT_HDMI_4    = 13
-constant integer REQUIRED_INPUT_USB_1    = 14
-constant integer REQUIRED_INPUT_USB_2    = 15
-constant integer REQUIRED_INPUT_USB_3    = 16
-constant integer REQUIRED_INPUT_USB_4    = 17
+constant integer INPUT_SLOT_1               = 1
+constant integer INPUT_SLOT_1A              = 2
+constant integer INPUT_SLOT_1B              = 3
+constant integer INPUT_SLOT_2               = 4
+constant integer INPUT_SLOT_2A              = 5
+constant integer INPUT_SLOT_2B              = 6
+constant integer INPUT_SLOT_3               = 7
+constant integer INPUT_PC_1                 = 8
+constant integer INPUT_DVI_1                = 9
+constant integer INPUT_HDMI_1               = 10
+constant integer INPUT_HDMI_2               = 11
+constant integer INPUT_HDMI_3               = 12
+constant integer INPUT_HDMI_4               = 13
+constant integer INPUT_USB_1                = 14
+constant integer INPUT_USB_2                = 15
+constant integer INPUT_USB_3                = 16
+constant integer INPUT_USB_4                = 17
+constant integer INPUT_DIGITAL_LINK_1       = 18
 
-constant integer ACTUAL_INPUT_SLOT_1    = 1
-constant integer ACTUAL_INPUT_SLOT_1A    = 2
-constant integer ACTUAL_INPUT_SLOT_1B    = 3
-constant integer ACTUAL_INPUT_SLOT_2    = 4
-constant integer ACTUAL_INPUT_SLOT_2A    = 5
-constant integer ACTUAL_INPUT_SLOT_2B    = 6
-constant integer ACTUAL_INPUT_SLOT_3    = 7
-constant integer ACTUAL_INPUT_PC_1    = 8
-constant integer ACTUAL_INPUT_HDMI_1    = 9
-constant integer ACTUAL_INPUT_DVI_1    = 10
-constant integer ACTUAL_INPUT_HDMI_2    = 11
-constant integer ACTUAL_INPUT_HDMI_3    = 12
-constant integer ACTUAL_INPUT_HDMI_4    = 13
-constant integer ACTUAL_INPUT_USB_1    = 14
-constant integer ACTUAL_INPUT_USB_2    = 15
-constant integer ACTUAL_INPUT_USB_3    = 16
-constant integer ACTUAL_INPUT_USB_4    = 17
+constant char INPUT_SNAPI_PARAMS[][NAV_MAX_CHARS]   =   {
+                                                            'VGA,1',
+                                                            'SLOT,1,A',
+                                                            'SLOT,1,B',
+                                                            'SLOT,2,A',
+                                                            'SLOT,2,B',
+                                                            'SLOT,3',
+                                                            'PC,1',
+                                                            'DVI,1',
+                                                            'HDMI,1',
+                                                            'HDMI,2',
+                                                            'HDMI,3',
+                                                            'HDMI,4',
+                                                            'USB,1',
+                                                            'USB,2',
+                                                            'USB,3',
+                                                            'USB,4',
+                                                            'DIGITAL_LINK,1'
+                                                        }
 
 constant char INPUT_COMMANDS[][NAV_MAX_CHARS]   =   {
                                                         'SL1',
@@ -111,15 +122,16 @@ constant char INPUT_COMMANDS[][NAV_MAX_CHARS]   =   {
                                                         'SL2B',
                                                         'SL3',
                                                         'PC1',
-                                                        'HM1',
                                                         'DV1',
+                                                        'HM1',
                                                         'HM2',
                                                         'HM3',
                                                         'HM4',
                                                         'UD1',
                                                         'UD2',
                                                         'UD3',
-                                                        'UD4'
+                                                        'UD4',
+                                                        'DL1'
                                                     }
 
 constant integer GET_POWER  = 1
@@ -136,14 +148,14 @@ constant integer ACTUAL_MUTE_OFF    = 2
 constant integer MAX_VOLUME = 100
 constant integer MIN_VOLUME = 0
 
-constant integer COMM_MODE_SERIAL       = 1
-constant integer COMM_MODE_IP_DIRECT    = 2
-constant integer COMM_MODE_IP_INDIRECT  = 3
+constant integer MODE_SERIAL       = 1
+constant integer MODE_IP_DIRECT    = 2
+constant integer MODE_IP_INDIRECT  = 3
 
-constant char COMM_MODE_HEADER[][NAV_MAX_CHARS]    = { {NAV_STX_CHAR}, {'00'}, {NAV_STX_CHAR} }
-constant char COMM_MODE_DELIMITER[][NAV_MAX_CHARS]    = { {NAV_ETX_CHAR}, {NAV_CR_CHAR}, {NAV_ETX_CHAR} }
+constant char MODE_HEADER[][NAV_MAX_CHARS]    = { {NAV_STX_CHAR}, {'00'}, {NAV_STX_CHAR} }
+constant char MODE_DELIMITER[][NAV_MAX_CHARS]    = { {NAV_ETX_CHAR}, {NAV_CR_CHAR}, {NAV_ETX_CHAR} }
 
-constant integer DEFAULT_TCP_PORT    = 1024
+constant integer DEFAULT_IP_PORT    = 1024
 
 (***********************************************************)
 (*              DATA TYPE DEFINITIONS GO BELOW             *)
@@ -155,47 +167,25 @@ DEFINE_TYPE
 (***********************************************************)
 DEFINE_VARIABLE
 
-// volatile _NAVModule module
-volatile _NAVDisplay uDisplay
+volatile _NAVModule module
+volatile _NAVLogicEngine engine
+volatile _NAVDevicePriorityQueue queue
 
-volatile integer iLoop
-volatile integer iPollSequence = GET_POWER
+volatile _NAVDisplay object
 
-volatile integer iRequiredPower
-volatile integer iRequiredInput
-volatile integer iRequiredMute
-volatile sinteger siRequiredVolume = -1
+volatile integer pollSequence = GET_POWER
 
-volatile integer iSemaphore
-volatile char cRxBuffer[NAV_MAX_BUFFER]
+volatile char id[3] = ''
 
-volatile integer iPowerBusy
+volatile char baudRate[NAV_MAX_CHARS]    = '9600'
 
-volatile integer iCommandBusy
-volatile integer iCommandLockOut
+volatile integer mode = MODE_SERIAL
 
-volatile char cID[3] = ''
+volatile char secureCommandRequired
+volatile char connectionStarted
+volatile char md5Seed[255]
 
-volatile integer iRebuildReady = false
-
-volatile _NAVSocketConnection uIPConnection
-
-volatile integer iInputInitialized
-volatile integer iVolumeInitialized
-volatile integer iAudioMuteInitialized
-
-volatile integer iCommMode = COMM_MODE_SERIAL
-volatile integer iCommModeIP    = COMM_MODE_IP_DIRECT
-
-volatile integer iSecureCommandRequired
-volatile integer iConnectionStarted
-volatile char cMD5RandomNumber[255]
-volatile char cMD5StringToEncode[255]
-
-volatile char cUserName[NAV_MAX_CHARS] = 'dispadmin'
-volatile char cPassword[NAV_MAX_CHARS] = '@Panasonic'
-
-volatile char cBaudRate[NAV_MAX_CHARS]    = '9600'
+volatile _NAVCredential credential = { 'dispadmin', '@Panasonic' }
 
 (***********************************************************)
 (*               LATCHING DEFINITIONS GO BELOW             *)
@@ -213,104 +203,106 @@ DEFINE_MUTUALLY_EXCLUSIVE
 (* EXAMPLE: DEFINE_FUNCTION <RETURN_TYPE> <NAME> (<PARAMETERS>) *)
 (* EXAMPLE: DEFINE_CALL '<NAME>' (<PARAMETERS>) *)
 
-define_function SendStringRaw(char payload[]) {
-    if (dvPort.NUMBER == 0) {
-        NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'String To ', NAVConvertDPSToAscii(dvPort), '-[', payload, ']'")
+define_function SendString(char payload[]) {
+    payload = "payload, MODE_DELIMITER[mode]"
+
+    if (secureCommandRequired && ModeIsIp(mode)) {
+        payload = "NAVHexToString(NAVMd5GetHash(GetMd5Message(credential, md5Seed))), payload"
+    }
+
+    if (ModeIsIp(mode)) {
+        NAVErrorLog(NAV_LOG_LEVEL_DEBUG,
+                    NAVFormatStandardLogMessage(NAV_STANDARD_LOG_MESSAGE_TYPE_STRING_TO,
+                                                dvPort,
+                                                payload))
     }
 
     send_string dvPort, "payload"
 }
 
 
-define_function SendString(char cmd[]) {
-    char cPayload[NAV_MAX_BUFFER]
+define_function char[NAV_MAX_BUFFER] BuildProtocol(char message[]) {
+    char payload[NAV_MAX_BUFFER]
 
-    cPayload = COMM_MODE_HEADER[iCommMode]
+    payload = MODE_HEADER[mode]
 
-    if (length_array(cID)) {
-        cPayload = "cPayload, 'AD94;RAD:', cID, ';'"
+    if (length_array(id)) {
+        payload = "payload, 'AD94;RAD:', id, ';'"
     }
 
-    cPayload = "cPayload, cmd, COMM_MODE_DELIMITER[iCommMode]"
-
-    if (iSecureCommandRequired && CommModeIsIP(iCommMode)) {
-        cPayload = "NAVHexToString(NAVMd5GetHash(cMD5StringToEncode)), cPayload"
-    }
-
-    SendStringRaw(cPayload)
-}
-
-
-define_function PassthruSend(char cmd[]) {
-    char cPayload[NAV_MAX_BUFFER]
-
-    cPayload = "COMM_MODE_HEADER[iCommMode], cmd, COMM_MODE_DELIMITER[iCommMode]"
-
-    if (iSecureCommandRequired && CommModeIsIP(iCommMode)) {
-        cPayload = "NAVHexToString(NAVMd5GetHash(cMD5StringToEncode)), cPayload"
-    }
-
-    SendStringRaw(cPayload)
-}
-
-
-define_function integer CommModeIsIP(integer mode) {
-    return mode == COMM_MODE_IP_DIRECT || mode == COMM_MODE_IP_INDIRECT
+    return "payload, message"
 }
 
 
 define_function SendQuery(integer query) {
+    if (queue.Busy) {
+        return
+    }
+
     switch (query) {
-        case GET_POWER:     { SendString("'QPW'") }
-        case GET_INPUT:     { SendString("'QMI'") }
-        case GET_MUTE:      { SendString("'QAM'") }
-        case GET_VOLUME:    { SendString("'QAV'") }
+        case GET_POWER:     { EnqueueQueryItem(BuildProtocol("'QPW'")) }
+        case GET_INPUT:     { EnqueueQueryItem(BuildProtocol("'QMI'")) }
+        case GET_MUTE:      { EnqueueQueryItem(BuildProtocol("'QAM'")) }
+        case GET_VOLUME:    { EnqueueQueryItem(BuildProtocol("'QAV'")) }
+        default:            { SendQuery(GET_POWER) }
     }
 }
 
 
-define_function TimeOut() {
-    cancel_wait 'CommsTimeOut'
+define_function CommunicationTimeOut(integer timeout) {
+    cancel_wait 'TimeOut'
 
-    wait 300 'CommsTimeOut' {
-        [vdvObject, DEVICE_COMMUNICATING] = false
+    module.Device.IsCommunicating = true
+    UpdateFeedback()
 
-        if (CommModeIsIP(iCommMode)) {
-            //uIPConnection.IsConnected = false
-            NAVClientSocketClose(dvPort.PORT)
-        }
+    wait (timeout * 10) 'TimeOut' {
+        module.Device.IsCommunicating = false
+        UpdateFeedback()
     }
 }
+
+
+define_function Reset() {
+    module.Device.SocketConnection.IsConnected = false
+    module.Device.IsCommunicating = false
+    module.Device.IsInitialized = false
+    UpdateFeedback()
+
+    connectionStarted = false
+
+    NAVLogicEngineStop(engine)
+}
+
 
 
 define_function SetPower(integer state) {
     switch (state) {
-        case REQUIRED_POWER_ON:     { SendString("'PON'") }
-        case REQUIRED_POWER_OFF:    { SendString("'POF'") }
+        case REQUIRED_POWER_ON:     { EnqueueCommandItem(BuildProtocol("'PON'")) }
+        case REQUIRED_POWER_OFF:    { EnqueueCommandItem(BuildProtocol("'POF'")) }
     }
 }
 
 
 define_function SetInput(integer input) {
-    SendString("'IMS:', INPUT_COMMANDS[input]")
+    EnqueueCommandItem(BuildProtocol("'IMS:', INPUT_COMMANDS[input]"))
 }
 
 
 define_function SetVolume(sinteger volume) {
-    SendString("'AVL:', format('%03d', volume)")
+    EnqueueCommandItem(BuildProtocol("'AVL:', format('%03d', volume)"))
 }
 
 
 define_function RampVolume(integer direction) {
     switch (direction) {
         case VOL_UP: {
-            if (uDisplay.Volume.Level.Actual < MAX_VOLUME) {
-                SendString("'AUU'")
+            if (object.Volume.Level.Actual < MAX_VOLUME) {
+                EnqueueCommandItem(BuildProtocol("'AUU'"))
             }
         }
         case VOL_DN: {
-            if (uDisplay.Volume.Level.Actual > MIN_VOLUME) {
-                SendString("'AUD'")
+            if (object.Volume.Level.Actual > MIN_VOLUME) {
+                EnqueueCommandItem(BuildProtocol("'AUD'"))
             }
         }
     }
@@ -319,336 +311,476 @@ define_function RampVolume(integer direction) {
 
 define_function SetMute(integer state) {
     switch (state) {
-        case REQUIRED_MUTE_ON:  { SendString("'AMT:1'") }
-        case REQUIRED_MUTE_OFF: { SendString("'AMT:0'") }
+        case REQUIRED_MUTE_ON:  { EnqueueCommandItem(BuildProtocol("'AMT:1'")) }
+        case REQUIRED_MUTE_OFF: { EnqueueCommandItem(BuildProtocol("'AMT:0'")) }
     }
 }
 
 
-define_function char[NAV_MAX_CHARS] GetCommMode(integer mode) {
-    switch (mode) {
-        case COMM_MODE_SERIAL:      { return 'Serial' }
-        case COMM_MODE_IP_DIRECT:   { return 'IP_Direct' }
-        case COMM_MODE_IP_INDIRECT: { return 'IP_Indirect' }
-        default:                    { return 'Unknown'}
-    }
+define_function integer ModeIsIp(integer mode) {
+    return mode == MODE_IP_DIRECT || mode == MODE_IP_INDIRECT
 }
 
 
-define_function Process() {
-    stack_var char cTemp[NAV_MAX_BUFFER]
-
-    if (iSemaphore) {
+define_function MaintainSocketConnection() {
+    if (module.Device.SocketConnection.IsConnected) {
         return
     }
 
-    iSemaphore = true
-    while (length_array(cRxBuffer) && NAVContains(cRxBuffer, COMM_MODE_DELIMITER[iCommMode])) {
-        cTemp = remove_string(cRxBuffer, COMM_MODE_DELIMITER[iCommMode], 1)
+    ModuleLog(0, "'Attempting to connect to ', module.Device.SocketConnection.Address, ':', itoa(module.Device.SocketConnection.Port)")
 
-        if (iCommModeIP == COMM_MODE_IP_DIRECT && iConnectionStarted) {
-            NAVClientSocketClose(dvPort.PORT)
-            //MaintainIPConnection()
-        }
-
-        if (!length_array(cTemp)) {
-            continue
-        }
-
-        if (dvPort.NUMBER == 0) {
-            NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'Parsing String From ', NAVConvertDPSToAscii(dvPort), ' in Comm Mode[', GetCommMode(iCommMode), ']', '-[', cTemp, ']'")
-        }
-
-        cTemp = NAVStripCharsFromRight(cTemp, 1)    //Remove delimiter
-
-        select {
-            active (NAVStartsWith(cTemp, 'NTCONTROL')): {// || NAVStartsWith(cTemp, 'PDPCONTROL')): {
-                //Connection Started
-                cTemp = NAVStripCharsFromLeft(cTemp, 10);
-                //remove_string(cTemp, ' ', 1)
-                iSecureCommandRequired = atoi(remove_string(cTemp, ' ', 1));
-
-                if (iSecureCommandRequired) {
-                    cMD5RandomNumber = cTemp;
-                    //if (len(password) > 0 && len(user_name) > 0) {
-                        cMD5StringToEncode = "cUserName, ':', cPassword, ':', cMD5RandomNumber"
-                    //}//else {
-                        //sMD5StringToEncode = DEFAULT_USER_NAME + ":" + DEFAULT_PASSWORD + ":" + sMD5RandomNumber;
-                    //}
-                }
-
-                iConnectionStarted = 1;
-                iLoop = 0;
-                Drive();
-            }
-            active (NAVStartsWith(cTemp, COMM_MODE_HEADER[iCommMode])): {
-                remove_string(cTemp, COMM_MODE_HEADER[iCommMode], 1)
-
-                if (NAVStartsWith(cTemp, 'ER')) {
-                    iPollSequence = GET_POWER
-                    continue
-                }
-
-                if (NAVContains(cTemp, 'AD94;RAD:')) {
-                    stack_var char cTempID[3]
-
-                    remove_string(cTemp, ':', 1)
-
-                    cTempID = NAVStripCharsFromRight(remove_string(cTemp, ';', 1), 1)
-
-                    if (cTempID != cID) {
-                        iPollSequence = GET_POWER
-                        continue
-                    }
-                }
-
-                switch (iCommMode) {
-                    case COMM_MODE_SERIAL:
-                    case COMM_MODE_IP_INDIRECT: {
-                        stack_var char cAttribute[NAV_MAX_CHARS]
-
-                        cAttribute = NAVStripCharsFromRight(remove_string(cTemp, ':', 1), 1)
-
-                        select {
-                            active (cAttribute == 'QPW'): {
-                                stack_var integer iTemp
-
-                                iTemp = atoi(cTemp)
-
-                                switch (iTemp) {
-                                    case false: uDisplay.PowerState.Actual = ACTUAL_POWER_OFF
-                                    case true: uDisplay.PowerState.Actual = ACTUAL_POWER_ON
-                                }
-
-                                UpdateFeedback()
-
-                                select {
-                                    active (!iInputInitialized): {
-                                        iPollSequence = GET_INPUT
-                                    }
-                                    active (!iVolumeInitialized): {
-                                        iPollSequence = GET_VOLUME
-                                    }
-                                    active (!iAudioMuteInitialized): {
-                                        iPollSequence = GET_MUTE
-                                    }
-                                }
-                            }
-                            active (cAttribute == 'QMI'): {
-                                uDisplay.Input.Actual = NAVFindInArraySTRING(INPUT_COMMANDS, cTemp)
-                                iInputInitialized = true
-                                iPollSequence = GET_POWER
-                            }
-                            active (cAttribute == 'QAV'): {
-                                stack_var sinteger siTemp
-
-                                siTemp = atoi(cTemp)
-
-                                if (uDisplay.Volume.Level.Actual != siTemp) {
-                                    uDisplay.Volume.Level.Actual = siTemp
-                                    send_level vdvObject, 1, uDisplay.Volume.Level.Actual * 255 / MAX_VOLUME
-                                }
-
-                                iVolumeInitialized = true
-                                iPollSequence = GET_POWER
-                            }
-                            active (cAttribute == 'QAM'): {
-                                stack_var integer iTemp
-
-                                iTemp = atoi(cTemp)
-
-                                switch (iTemp) {
-                                    case false: uDisplay.Volume.Mute.Actual = ACTUAL_MUTE_OFF
-                                    case true: uDisplay.Volume.Mute.Actual = ACTUAL_MUTE_ON
-                                }
-
-                                UpdateFeedback()
-
-                                iAudioMuteInitialized = true
-                                iPollSequence = GET_POWER
-                            }
-                        }
-                    }
-                    case COMM_MODE_IP_DIRECT: {
-                        select {
-                            active (NAVContains(cTemp, 'IMS') > 0): {
-                                //Input Switch Ack
-                            }
-                            active (NAVContains(cTemp, 'AVL') > 0): {
-                                //Volume Change Ack
-                            }
-                            active (NAVContains(cTemp, 'DGE') > 0): {
-                                //Auto Setup Ack
-                            }
-                            active (NAVContains(cTemp, 'OSP') > 0): {
-                                //OSD Ack
-                            }
-                            active (NAVContains(cTemp, 'VMT') > 0): {
-                                //Video Mute Ack
-                            }
-                            active (NAVContains(cTemp, 'AMT') > 0): {
-                                //Audio Mute Ack
-                            }
-                            active (NAVContains(cTemp, 'PON') > 0): {
-                                //Power On Ack
-                            }
-                            active (NAVContains(cTemp, 'POF') > 0): {
-                                //Power Off Ack
-                            }
-                            active (NAVContains(cTemp, 'UD1') > 0): {
-                                //???
-                            }
-                            active (true): {
-                                switch (iPollSequence) {
-                                    case GET_POWER: {
-                                        if (length_array(cTemp) = 1) {
-                                            switch (atoi(cTemp)) {
-                                                case 0: { uDisplay.PowerState.Actual = ACTUAL_POWER_OFF; }    //Power Off
-                                                case 1: {
-                                                    uDisplay.PowerState.Actual = ACTUAL_POWER_ON;    //Power On
-                                                    select {
-                                                        active (!iInputInitialized): { iPollSequence = GET_INPUT; }
-                                                        active (!iAudioMuteInitialized): { iPollSequence = GET_MUTE; }
-                                                        active (!iVolumeInitialized): { iPollSequence = GET_VOLUME; }
-                                                        active (true): { iPollSequence = GET_INPUT; }
-                                                    }
-                                                }
-                                            }
-
-                                            UpdateFeedback()
-                                        }
-                                    }
-                                    case GET_MUTE: {
-                                        stack_var integer iTemp
-
-                                        if (length_array(cTemp) = 1) {
-                                            iTemp = atoi(cTemp);
-
-                                            switch (iTemp) {
-                                                case 0: { uDisplay.Volume.Mute.Actual = ACTUAL_MUTE_OFF; }
-                                                case 1: { uDisplay.Volume.Mute.Actual = ACTUAL_MUTE_ON; }
-                                            }
-
-                                            UpdateFeedback()
-
-                                            iAudioMuteInitialized = 1;
-                                            iPollSequence = GET_POWER;
-                                        }
-                                    }
-                                    case GET_VOLUME: {
-                                        stack_var sinteger siTemp
-
-                                        siTemp = atoi(cTemp);
-
-                                        if (siTemp != uDisplay.Volume.Level.Actual) {
-                                            uDisplay.Volume.Level.Actual = siTemp;
-                                            send_level vdvObject, 1, uDisplay.Volume.Level.Actual * 255 / MAX_VOLUME
-                                        }
-
-                                        iVolumeInitialized = 1;
-                                        iPollSequence = GET_POWER;
-                                    }
-                                    case GET_INPUT: {
-                                        uDisplay.Input.Actual = NAVFindInArraySTRING(INPUT_COMMANDS, cTemp)
-                                        iInputInitialized = true
-                                        iPollSequence = GET_POWER
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    iSemaphore = false
+    NAVClientSocketOpen(dvPort.PORT,
+                        module.Device.SocketConnection.Address,
+                        module.Device.SocketConnection.Port,
+                        IP_TCP)
 }
 
 
-define_function Drive() {
-    if (!iConnectionStarted && CommModeIsIP(iCommMode) && iCommModeIP == COMM_MODE_IP_DIRECT) {
+define_function char[NAV_MAX_BUFFER] GetMd5Message(_NAVCredential credential, char md5Seed[]) {
+    return "credential.Username, ':', credential.Password, ':', md5Seed"
+}
+
+
+define_function EnqueueCommandItem(char item[]) {
+    NAVDevicePriorityQueueEnqueue(queue, item, true)
+}
+
+
+define_function EnqueueQueryItem(char item[]) {
+    NAVDevicePriorityQueueEnqueue(queue, item, false)
+}
+
+
+#IF_DEFINED USING_NAV_DEVICE_PRIORITY_QUEUE_SEND_NEXT_ITEM_EVENT_CALLBACK
+define_function NAVDevicePriorityQueueSendNextItemEventCallback(char item[]) {
+    SendString(item)
+}
+#END_IF
+
+
+#IF_DEFINED USING_NAV_DEVICE_PRIORITY_QUEUE_FAILED_RESPONSE_EVENT_CALLBACK
+define_function NAVDevicePriorityQueueFailedResponseEventCallback(_NAVDevicePriorityQueue queue) {
+    module.Device.IsCommunicating = false
+    UpdateFeedback()
+}
+#END_IF
+
+
+#IF_DEFINED USING_NAV_LOGIC_ENGINE_EVENT_CALLBACK
+define_function NAVLogicEngineEventCallback(_NAVLogicEngineEvent args) {
+    if (!connectionStarted && ModeIsIp(mode)) {
         return;
     }
 
-    if (iSecureCommandRequired && !length_array(cMD5StringToEncode) && CommModeIsIP(iCommMode) && iCommModeIP == COMM_MODE_IP_DIRECT) {
+    if (secureCommandRequired && !length_array(md5Seed) && ModeIsIp(mode)) {
         return;
     }
 
-    if (!uIPConnection.IsConnected && CommModeIsIP(iCommMode)) {
+    if (!module.Device.SocketConnection.IsConnected && ModeIsIp(mode)) {
         return;
     }
 
-    iLoop++
+    if (queue.Busy) {
+        return;
+    }
 
-    switch (iLoop) {
-        case 1:
-        case 6:
-        case 11:
-        case 16: { SendQuery(iPollSequence); return }
-        case 21: { iLoop = 1; return }
-        default: {
-            if (iCommandLockOut) { return }
-
-            if (iRequiredPower && (iRequiredPower == uDisplay.PowerState.Actual)) { iRequiredPower = 0; return }
-            if (iRequiredInput && (iRequiredInput == uDisplay.Input.Actual)) { iRequiredInput = 0; return }
-            if (iRequiredMute && (iRequiredMute == uDisplay.Volume.Mute.Actual)) { iRequiredMute = 0; return }
-
-            if (iRequiredPower && (iRequiredPower != uDisplay.PowerState.Actual)) {
-                iCommandBusy = true
-                SetPower(iRequiredPower)
-                iCommandLockOut = true
-                wait 80 iCommandLockOut = false
-                iPollSequence = GET_POWER
+    switch (args.Name) {
+        case NAV_LOGIC_ENGINE_EVENT_QUERY: {
+            SendQuery(pollSequence)
+            return
+        }
+        case NAV_LOGIC_ENGINE_EVENT_ACTION: {
+            if (module.CommandBusy) {
                 return
             }
 
-            if (iRequiredInput && (uDisplay.PowerState.Actual == ACTUAL_POWER_ON) && (iRequiredInput != uDisplay.Input.Actual)) {
-                iCommandBusy = true
-                SetInput(iRequiredInput)
-                iCommandLockOut = true
-                wait 10 iCommandLockOut = false
-                iPollSequence = GET_INPUT
+            if (object.PowerState.Required && (object.PowerState.Required == object.PowerState.Actual)) { object.PowerState.Required = 0; return }
+            if (object.Input.Required && (object.Input.Required == object.Input.Actual)) { object.Input.Required = 0; return }
+            if (object.Volume.Mute.Required && (object.Volume.Mute.Required == object.Volume.Mute.Actual)) { object.Volume.Mute.Required = 0; return }
+
+            if (object.PowerState.Required && (object.PowerState.Required != object.PowerState.Actual)) {
+                SetPower(object.PowerState.Required)
+                module.CommandBusy = true
+                wait 80 module.CommandBusy = false
+                pollSequence = GET_POWER
+                return
+            }
+
+            if (object.Input.Required && (object.PowerState.Actual == ACTUAL_POWER_ON) && (object.Input.Required != object.Input.Actual)) {
+                SetInput(object.Input.Required)
+                module.CommandBusy = true
+                wait 10 module.CommandBusy = false
+                pollSequence = GET_INPUT
                 return
             }
 
 
-            if (iRequiredMute && (uDisplay.PowerState.Actual == ACTUAL_POWER_ON) && (iRequiredMute != uDisplay.Volume.Mute.Actual)) {
-                iCommandBusy = true
-                SetMute(iRequiredMute);
-                iCommandLockOut = true
-                wait 10 iCommandLockOut = false
-                iPollSequence = GET_MUTE;
+            if (object.Volume.Mute.Required && (object.PowerState.Actual == ACTUAL_POWER_ON) && (object.Volume.Mute.Required != object.Volume.Mute.Actual)) {
+                SetMute(object.Volume.Mute.Required)
+                module.CommandBusy = true
+                wait 10 module.CommandBusy = false
+                pollSequence = GET_MUTE;
                 return
             }
-
-            // if (siRequiredVolume >= 0) {// && (uDisplay.PowerState.Actual == ACTUAL_POWER_ON)) {// && [vdvObject, DEVICE_COMMUNICATING]) {
-            //     iCommandBusy = true
-            //     SetVolume(siRequiredVolume);
-            //     siRequiredVolume = -1
-            //     iPollSequence = GET_VOLUME;
-            //     return
-            // }
 
             if ([vdvObject, VOL_UP]) { RampVolume(VOL_UP) }
             if ([vdvObject, VOL_DN]) { RampVolume(VOL_DN) }
         }
     }
 }
+#END_IF
 
 
-define_function MaintainIPConnection() {
-    if (uIPConnection.IsConnected) {
+define_function char[NAV_MAX_BUFFER] GetError(integer error) {
+    switch (error) {
+        case 401:   { return 'Command cannot be executed' }
+        case 402:   { return 'Invalid parameter' }
+        default:    { return 'Unknown error' }
+    }
+}
+
+
+define_function ProcessPowerResponse(char data[]) {
+    switch (atoi(data)) {
+        case false: {
+            object.PowerState.Actual = ACTUAL_POWER_OFF
+        }
+        case true: {
+            object.PowerState.Actual = ACTUAL_POWER_ON
+
+            select {
+                active (!object.Input.Initialized): {
+                    pollSequence = GET_INPUT
+                }
+                active (!object.Volume.Level.Initialized): {
+                    pollSequence = GET_VOLUME
+                }
+                active (!object.Volume.Mute.Initialized): {
+                    pollSequence = GET_MUTE
+                }
+                active (true): {
+                    pollSequence = GET_INPUT
+                }
+            }
+        }
+    }
+
+    UpdateFeedback()
+}
+
+
+define_function ProcessInputResponse(char data[]) {
+    object.Input.Actual = NAVFindInArrayString(INPUT_COMMANDS, data)
+    object.Input.Initialized = true
+    pollSequence = GET_POWER
+}
+
+
+define_function ProcessVolumeResponse(char data[]) {
+    sinteger level
+
+    level = atoi(data)
+
+    if (object.Volume.Level.Actual != level) {
+        object.Volume.Level.Actual = level
+        send_level vdvObject, VOL_LVL, object.Volume.Level.Actual * 255 / MAX_VOLUME
+        send_string vdvObject, "'VOLUME-ABS,', itoa(object.Volume.Level.Actual)"
+        send_string vdvObject, "'VOLUME-', itoa(object.Volume.Level.Actual * 255 / MAX_VOLUME)"
+    }
+
+    object.Volume.Level.Initialized = true
+    pollSequence = GET_POWER
+}
+
+
+define_function ProcessMuteResponse(char data[]) {
+    switch (atoi(data)) {
+        case false: {
+            object.Volume.Mute.Actual = ACTUAL_MUTE_OFF
+        }
+        case true: {
+            object.Volume.Mute.Actual = ACTUAL_MUTE_ON
+        }
+    }
+
+    UpdateFeedback()
+
+    object.Volume.Mute.Initialized = true;
+    pollSequence = GET_POWER;
+}
+
+
+#IF_DEFINED USING_NAV_STRING_GATHER_CALLBACK
+define_function NAVStringGatherCallback(_NAVStringGatherResult args) {
+    stack_var char data[NAV_MAX_BUFFER]
+    stack_var char delimiter[NAV_MAX_CHARS]
+
+    data = args.Data
+    delimiter = args.Delimiter
+
+    if (ModeIsIp(mode)) {
+        NAVErrorLog(NAV_LOG_LEVEL_DEBUG,
+                    NAVFormatStandardLogMessage(NAV_STANDARD_LOG_MESSAGE_TYPE_PARSING_STRING_FROM,
+                                                dvPort,
+                                                data))
+    }
+
+    data = NAVStripRight(data, length_array(delimiter))
+
+    select {
+        active (NAVStartsWith(data, 'NTCONTROL')): {// || NAVStartsWith(data, 'PDPCONTROL')): {
+            data = NAVStripLeft(data, 10);
+
+            secureCommandRequired = atoi(remove_string(data, ' ', 1));
+
+            if (secureCommandRequired) {
+                md5Seed = data;
+            }
+
+            connectionStarted = true;
+        }
+        active (NAVStartsWith(data, MODE_HEADER[mode])): {
+            stack_var char last[NAV_MAX_BUFFER]
+
+            last = NAVDevicePriorityQueueGetLastMessage(queue)
+
+            remove_string(data, MODE_HEADER[mode], 1)
+
+            if (NAVStartsWith(data, 'ER')) {
+                pollSequence = GET_POWER
+
+                // ER401 - Command cannot be executed
+                // ER402 - Invalid parameter
+
+                // Common reasons for ER401:
+                // - The projector is in a state where the command cannot be executed
+                // --- Some commands cannot be executed when the projector is in standby
+                // --- Sending 'QIN' (Get Input) when the projector is in standby will return ER401
+                // --- Sending 'QSE' (Get Aspect) when the projector isn't displaying an image will return ER401
+
+                remove_string(data, 'ER', 1)
+
+                ModuleLog(NAV_LOG_LEVEL_ERROR,
+                            "'Error: Command [', last, MODE_DELIMITER[mode], '] failed with error code ', data, ': ',
+                                GetError(atoi(data))")
+
+                NAVDevicePriorityQueueGoodResponse(queue)
+                return
+            }
+
+            // Check if the message is addressed to this unit
+            if (NAVContains(data, 'AD94;RAD:')) {
+                stack_var char thisId[3]
+
+                remove_string(data, ':', 1)
+
+                thisId = NAVStripRight(remove_string(data, ';', 1), 1)
+
+                if (thisId != id) {
+                    pollSequence = GET_POWER
+                    NAVDevicePriorityQueueGoodResponse(queue)
+                    return
+                }
+            }
+
+            switch (mode) {
+                case MODE_SERIAL:
+                case MODE_IP_INDIRECT: {
+                    stack_var char cmd[NAV_MAX_CHARS]
+
+                    cmd = NAVStripRight(remove_string(data, ':', 1), 1)
+
+                    switch (cmd){
+                        case 'QPW': {
+                            ProcessPowerResponse(data)
+                        }
+                        case 'QMI': {
+                            ProcessInputResponse(data)
+                        }
+                        case 'QAV': {
+                            ProcessVolumeResponse(data)
+                        }
+                        case 'QAM': {
+                            ProcessMuteResponse(data)
+                        }
+                    }
+                }
+                case MODE_IP_DIRECT: {
+                    // Ignore if not a response to a query
+                    if (!NAVStartsWith(last, 'Q')) {
+                        NAVDevicePriorityQueueGoodResponse(queue)
+                        return
+                    }
+
+                    select {
+                        active (NAVContains(last, 'QPW')): {
+                            ProcessPowerResponse(data)
+                        }
+                        active (NAVContains(last, 'QAM')): {
+                            ProcessMuteResponse(data)
+                        }
+                        active (NAVContains(last, 'QAV')): {
+                            ProcessVolumeResponse(data)
+                        }
+                        active (NAVContains(last, 'QMI')): {
+                            ProcessInputResponse(data)
+                        }
+                    }
+                }
+            }
+
+            NAVDevicePriorityQueueGoodResponse(queue)
+        }
+    }
+}
+
+
+#IF_DEFINED USING_NAV_MODULE_BASE_PROPERTY_EVENT_CALLBACK
+define_function NAVModulePropertyEventCallback(_NAVModulePropertyEvent event) {
+    if (event.Device != vdvObject) {
         return
     }
 
-    NAVClientSocketOpen(dvPort.PORT, uIPConnection.Address, uIPConnection.Port, IP_TCP)
+    switch (event.Name) {
+        case NAV_MODULE_PROPERTY_EVENT_IP_ADDRESS: {
+            module.Device.SocketConnection.Address = NAVTrimString(event.Args[1])
+            ModuleLog(0, "'Setting IP Address to ', module.Device.SocketConnection.Address")
+            NAVTimelineStart(TL_SOCKET_CHECK,
+                                TL_SOCKET_CHECK_INTERVAL,
+                                TIMELINE_ABSOLUTE,
+                                TIMELINE_REPEAT)
+        }
+        case 'IP_PORT': {
+            module.Device.SocketConnection.Port = atoi(event.Args[1])
+            ModuleLog(0, "'Setting IP Port to ', itoa(module.Device.SocketConnection.Port)")
+        }
+        case 'COMM_MODE': {
+            switch (event.Args[1]) {
+                case 'SERIAL': {
+                    mode = MODE_SERIAL
+                    ModuleLog(0, "'Setting Comm Mode to Serial'")
+                }
+                case 'IP_DIRECT': {
+                    mode = MODE_IP_DIRECT
+                    ModuleLog(0, "'Setting Comm Mode to IP Direct'")
+                }
+                case 'IP_INDIRECT': {
+                    mode = MODE_IP_INDIRECT
+                    ModuleLog(0, "'Setting Comm Mode to IP Indirect'")
+                }
+            }
+        }
+        case NAV_MODULE_PROPERTY_EVENT_ID: {
+            id = format('%03d', atoi(event.Args[1]))
+        }
+        case NAV_MODULE_PROPERTY_EVENT_BAUDRATE: {
+            baudRate = event.Args[1]
+
+            if ((mode == MODE_SERIAL) && device_id(event.Device)) {
+                NAVCommand(event.Device, "'SET BAUD ', baudRate, ',N,8,1 485 DISABLE'")
+            }
+        }
+        case NAV_MODULE_PROPERTY_EVENT_USERNAME: {
+            credential.Username = NAVTrimString(event.Args[1])
+        }
+        case NAV_MODULE_PROPERTY_EVENT_PASSWORD: {
+            credential.Password = NAVTrimString(event.Args[1])
+        }
+    }
+}
+#END_IF
+
+
+#IF_DEFINED USING_NAV_MODULE_BASE_PASSTHRU_EVENT_CALLBACK
+define_function NAVModulePassthruEventCallback(_NAVModulePassthruEvent event) {
+    if (event.Device != vdvObject) {
+        return
+    }
+
+    SendString(event.Payload)
+}
+#END_IF
+
+
+define_function HandleSnapiMessage(_NAVSnapiMessage message, tdata data) {
+    switch (message.Header) {
+        case 'POWER': {
+            switch (message.Parameter[1]) {
+                case 'ON': {
+                    object.PowerState.Required = REQUIRED_POWER_ON
+                }
+                case 'OFF': {
+                    object.PowerState.Required = REQUIRED_POWER_OFF
+                    object.Input.Required = 0
+                }
+            }
+        }
+        case 'MUTE': {
+            if (object.PowerState.Actual != ACTUAL_POWER_ON) {
+                return
+            }
+
+            switch (message.Parameter[1]) {
+                case 'ON': {
+                    object.Volume.Mute.Required = REQUIRED_MUTE_ON
+                }
+                case 'OFF': {
+                    object.Volume.Mute.Required = REQUIRED_MUTE_OFF
+                }
+            }
+        }
+        case 'VOLUME': {
+            switch (message.Parameter[1]) {
+                case 'ABS': {
+                    SetVolume(atoi(message.Parameter[2]))
+                    pollSequence = GET_VOLUME
+                }
+                default: {
+                    SetVolume(atoi(message.Parameter[1]) * 100 / 255)
+                    pollSequence = GET_VOLUME
+                }
+            }
+        }
+        case 'INPUT': {
+            stack_var integer input
+            stack_var char inputCommand[NAV_MAX_CHARS]
+
+            NAVTrimStringArray(message.Parameter)
+            inputCommand = NAVArrayJoinString(message.Parameter, ',')
+
+            input = NAVFindInArrayString(INPUT_SNAPI_PARAMS, inputCommand)
+
+            if (input <= 0) {
+                ModuleLog(NAV_LOG_LEVEL_WARNING, "'Invalid input: ', inputCommand")
+
+                return
+            }
+
+            object.PowerState.Required = REQUIRED_POWER_ON
+            object.Input.Required = input
+        }
+    }
 }
 
 
 define_function UpdateFeedback() {
-    [vdvObject, VOL_MUTE_FB] = (uDisplay.Volume.Mute.Actual == ACTUAL_MUTE_ON)
-    [vdvObject, POWER_FB] = (uDisplay.PowerState.Actual == ACTUAL_POWER_ON)
+    [vdvObject, NAV_IP_CONNECTED]	= (module.Device.SocketConnection.IsConnected)
+    [vdvObject, DEVICE_COMMUNICATING] = (module.Device.IsCommunicating)
+    [vdvObject, DATA_INITIALIZED] = (module.Device.IsInitialized)
+
+    [vdvObject, VOL_MUTE_FB] = (object.Volume.Mute.Actual == ACTUAL_MUTE_ON)
+    [vdvObject, POWER_FB] = (object.PowerState.Actual == ACTUAL_POWER_ON)
+}
+
+
+define_function ModuleLog(long level, char message[]) {
+    if (level == 0) {
+        NAVLog("__NAME__, ' [[', NAVDeviceToString(vdvObject), ']:[', NAVDeviceToString(dvPort), ']] => ', message")
+        return
+    }
+
+    NAVErrorLog(level,
+                "__NAME__, ' [[', NAVDeviceToString(vdvObject), ']:[', NAVDeviceToString(dvPort), ']] => ', message")
 }
 
 
@@ -656,9 +788,13 @@ define_function UpdateFeedback() {
 (*                STARTUP CODE GOES BELOW                  *)
 (***********************************************************)
 DEFINE_START {
-    create_buffer dvPort, cRxBuffer
+    NAVModuleInit(module)
+    NAVLogicEngineInit(engine)
+    NAVDevicePriorityQueueInit(queue)
 
-    uIPConnection.Port = DEFAULT_TCP_PORT
+    create_buffer dvPort, module.RxBuffer.Data
+    module.Device.SocketConnection.Socket = dvPort.PORT
+    module.Device.SocketConnection.Port = DEFAULT_IP_PORT
 }
 
 (***********************************************************)
@@ -669,7 +805,7 @@ DEFINE_EVENT
 data_event[dvPort] {
     online: {
         if (data.device.number != 0) {
-            NAVCommand(data.device, "'SET BAUD ', cBaudRate, ', N, 8, 1 485 DISABLE'")
+            NAVCommand(data.device, "'SET BAUD ', baudRate, ',N,8,1 485 DISABLE'")
             NAVCommand(data.device, "'B9MOFF'")
             NAVCommand(data.device, "'CHARD-0'")
             NAVCommand(data.device, "'CHARDM-0'")
@@ -677,186 +813,56 @@ data_event[dvPort] {
         }
 
         if (data.device.number == 0) {
-            uIPConnection.IsConnected = true
-
-            // iCommMode = iCommModeIP
-
-            // NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'PANASONIC_PLASMA_IP_ONLINE<', NAVStringSurroundWith(NAVDeviceToString(dvPortIP), '[', ']'), '>'")
+            module.Device.SocketConnection.IsConnected = true
+            UpdateFeedback()
         }
 
-        NAVTimelineStart(TL_DRIVE, TL_DRIVE_INTERVAL, TIMELINE_ABSOLUTE, TIMELINE_REPEAT)
+        NAVLogicEngineStart(engine)
     }
     string: {
-        [vdvObject, DEVICE_COMMUNICATING] = true
-        [vdvObject, DATA_INITIALIZED] = true
-
-        TimeOut()
+        CommunicationTimeOut(30)
 
         if (data.device.number == 0) {
-            NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'String From ', NAVConvertDPSToAscii(data.device), '-[', data.text, ']'")
+            NAVErrorLog(NAV_LOG_LEVEL_DEBUG,
+                        NAVFormatStandardLogMessage(NAV_STANDARD_LOG_MESSAGE_TYPE_STRING_FROM,
+                                                    data.device,
+                                                    data.text))
         }
 
-        if (!iSemaphore) { Process() }
+        select {
+            active(true): {
+                NAVStringGather(module.RxBuffer, MODE_DELIMITER[mode])
+            }
+        }
     }
     offline: {
         if (data.device.number == 0) {
-            uIPConnection.IsConnected = false
             NAVClientSocketClose(data.device.port)
-            iConnectionStarted = false
-            // iCommMode = COMM_MODE_SERIAL
-            // NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'PANASONIC_PLASMA_IP_OFFLINE<', NAVStringSurroundWith(NAVDeviceToString(dvPortIP), '[', ']'), '>'")
-
-            MaintainIPConnection()
+            Reset()
         }
     }
     onerror: {
         if (data.device.number == 0) {
-            uIPConnection.IsConnected = false
-            //NAVClientSocketClose(data.device.port)
-            // iCommMode = COMM_MODE_SERIAL
-            // NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'PANASONIC_PLASMA_IP_ONERROR<', NAVStringSurroundWith(NAVDeviceToString(dvPortIP), '[', ']'), '>'")
+            Reset()
         }
+
+        ModuleLog(NAV_LOG_LEVEL_ERROR, "'OnError: ', NAVGetSocketError(type_cast(data.number))")
     }
 }
 
 
 data_event[vdvObject] {
+    online: {
+        NAVCommand(data.device, "'PROPERTY-RMS_MONITOR_ASSET_PROPERTY,MONITOR_ASSET_DESCRIPTION,Monitor'")
+        NAVCommand(data.device, "'PROPERTY-RMS_MONITOR_ASSET_PROPERTY,MONITOR_ASSET_MANUFACTURER_URL,www.panasonic.com'")
+        NAVCommand(data.device, "'PROPERTY-RMS_MONITOR_ASSET_PROPERTY,MONITOR_ASSET_MANUFACTURER_NAME,Panasonic'")
+    }
     command: {
-        stack_var char cCmdHeader[NAV_MAX_CHARS]
-        stack_var char cCmdParam[3][NAV_MAX_CHARS]
+        stack_var _NAVSnapiMessage message
 
-        cCmdHeader = DuetParseCmdHeader(data.text)
-        cCmdParam[1] = DuetParseCmdParam(data.text)
-        cCmdParam[2] = DuetParseCmdParam(data.text)
-        cCmdParam[3] = DuetParseCmdParam(data.text)
+        NAVParseSnapiMessage(data.text, message)
 
-        switch (cCmdHeader) {
-            case 'PROPERTY': {
-                switch (cCmdParam[1]) {
-                    case 'IP_ADDRESS': {
-                        uIPConnection.Address = cCmdParam[2]
-                        NAVTimelineStart(TL_IP_CLIENT_CHECK, TL_IP_CLIENT_CHECK_INTERVAL, TIMELINE_ABSOLUTE, TIMELINE_REPEAT)
-                    }
-                    case 'IP_PORT': {
-                        uIPConnection.Port = atoi(cCmdParam[2])
-                    }
-                    case 'ID': {
-                        cID = format('%03d', atoi(cCmdParam[2]))
-                    }
-                    case 'COMM_MODE': {
-                        switch (cCmdParam[2]) {
-                            case 'SERIAL': {
-                                iCommMode = COMM_MODE_SERIAL
-                            }
-                            case 'IP_DIRECT': {
-                                iCommModeIP = COMM_MODE_IP_DIRECT
-                                iCommMode = COMM_MODE_IP_DIRECT
-                            }
-                            case 'IP_INDIRECT': {
-                                iCommModeIP = COMM_MODE_IP_INDIRECT
-                                iCommMode = COMM_MODE_IP_INDIRECT
-                            }
-                        }
-                    }
-                    case 'BAUD_RATE': {
-                        cBaudRate = cCmdParam[2]
-
-                        if ((iCommMode == COMM_MODE_SERIAL) && device_id(dvPort)) {
-                            send_command dvPort, "'SET BAUD ', cBaudRate, ', N, 8, 1 485 DISABLE'"
-                        }
-                    }
-                    case 'USER_NAME': {
-                        cUserName = cCmdParam[2]
-
-                        if (length_array(cMD5RandomNumber)) {
-                            cMD5StringToEncode = "cUserName, ':', cPassword, ':', cMD5RandomNumber"
-                        }
-                    }
-                    case 'PASSWORD': {
-                        cPassword = cCmdParam[2]
-
-                        if (length_array(cMD5RandomNumber)) {
-                            cMD5StringToEncode = "cUserName, ':', cPassword, ':', cMD5RandomNumber"
-                        }
-                    }
-                }
-            }
-            case 'REBUILD': { iRebuildReady = true }
-            case 'PASSTHRU': { PassthruSend(cCmdParam[1]) }
-            case 'POWER': {
-                switch (cCmdParam[1]) {
-                    case 'ON': { iRequiredPower = REQUIRED_POWER_ON; Drive() }
-                    case 'OFF': { iRequiredPower = REQUIRED_POWER_OFF; iRequiredInput = 0; Drive() }
-                }
-            }
-            case 'VOLUME': {
-                switch (cCmdParam[1]) {
-                    case 'ABS': {
-                        siRequiredVolume = atoi(cCmdParam[2]); Drive();
-                        SetVolume(siRequiredVolume);
-                        iPollSequence = GET_VOLUME
-                    }
-                    default: {
-                        siRequiredVolume = NAVScaleValue(atoi(cCmdParam[1]), 255, (MAX_VOLUME - MIN_VOLUME), 0); Drive();
-                        SetVolume(siRequiredVolume);
-                        iPollSequence = GET_VOLUME
-                    }
-                }
-            }
-            case 'INPUT': {
-                switch (cCmdParam[1]) {
-                    case 'VGA': {
-                        switch (cCmdParam[2]) {
-                            case '1': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_PC_1; Drive() }
-                        }
-                    }
-                    case 'SLOT': {
-                        switch (cCmdParam[2]) {
-                            case '1': {
-                                switch (cCmdParam[3]) {
-                                    case 'A': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_SLOT_1A; Drive() }
-                                    case 'B': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_SLOT_1B; Drive() }
-                                    default: { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_SLOT_1; Drive() }
-                                }
-                            }
-                            case '2': {
-                                switch (cCmdParam[3]) {
-                                    case 'A': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_SLOT_2A; Drive() }
-                                    case 'B': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_SLOT_2B; Drive() }
-                                    default: { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_SLOT_2; Drive() }
-                                }
-                            }
-                            case '3': {
-                                switch (cCmdParam[3]) {
-                                    default: { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_SLOT_3; Drive() }
-                                }
-                            }
-                        }
-                    }
-                    case 'HDMI': {
-                        switch (cCmdParam[2]) {
-                            case '1': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_HDMI_1; Drive() }
-                            case '2': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_HDMI_2; Drive() }
-                            case '3': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_HDMI_3; Drive() }
-                            case '4': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_HDMI_4; Drive() }
-                        }
-                    }
-                    case 'USB': {
-                        switch (cCmdParam[2]) {
-                            case '1': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_USB_1; Drive() }
-                            case '2': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_USB_2; Drive() }
-                            case '3': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_USB_3; Drive() }
-                            case '4': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_USB_4; Drive() }
-                        }
-                    }
-                    case 'DVI': {
-                        switch (cCmdParam[2]) {
-                            case '1': { iRequiredPower = REQUIRED_POWER_ON; iRequiredInput = REQUIRED_INPUT_DVI_1; Drive() }
-                        }
-                    }
-                }
-            }
-        }
+        HandleSnapiMessage(message, data)
     }
 }
 
@@ -865,34 +871,56 @@ channel_event[vdvObject, 0] {
     on: {
         switch (channel.channel) {
             case POWER: {
-                if (iRequiredPower) {
-                    switch (iRequiredPower) {
-                        case REQUIRED_POWER_ON: { iRequiredPower = REQUIRED_POWER_OFF; iRequiredInput = 0; Drive() }
-                        case REQUIRED_POWER_OFF: { iRequiredPower = REQUIRED_POWER_ON; Drive() }
+                if (object.PowerState.Required) {
+                    switch (object.PowerState.Required) {
+                        case REQUIRED_POWER_ON: {
+                            object.PowerState.Required = REQUIRED_POWER_OFF
+                            object.Input.Required = 0
+                        }
+                        case REQUIRED_POWER_OFF: {
+                            object.PowerState.Required = REQUIRED_POWER_ON
+                        }
                     }
                 }
                 else {
-                    switch (uDisplay.PowerState.Actual) {
-                        case ACTUAL_POWER_ON: { iRequiredPower = REQUIRED_POWER_OFF; iRequiredInput = 0; Drive() }
-                        case ACTUAL_POWER_OFF: { iRequiredPower = REQUIRED_POWER_ON; Drive() }
+                    switch (object.PowerState.Actual) {
+                        case ACTUAL_POWER_ON: {
+                            object.PowerState.Required = REQUIRED_POWER_OFF
+                            object.Input.Required = 0
+                        }
+                        case ACTUAL_POWER_OFF: {
+                            object.PowerState.Required = REQUIRED_POWER_ON
+                        }
                     }
                 }
             }
-            case PWR_ON: { iRequiredPower = REQUIRED_POWER_ON; Drive() }
-            case PWR_OFF: { iRequiredPower = REQUIRED_POWER_OFF; iRequiredInput = 0; Drive() }
-            //case PIC_MUTE: { SetShutter(![vdvObject, PIC_MUTE_FB]) }
+            case PWR_ON: {
+                object.PowerState.Required = REQUIRED_POWER_ON
+            }
+            case PWR_OFF: {
+                object.PowerState.Required = REQUIRED_POWER_OFF
+                object.Input.Required = 0
+            }
             case VOL_MUTE: {
-                if (uDisplay.PowerState.Actual == ACTUAL_POWER_ON) {
-                    if (iRequiredMute) {
-                        switch (iRequiredMute) {
-                            case REQUIRED_MUTE_ON: { iRequiredMute = REQUIRED_MUTE_OFF; Drive() }
-                            case REQUIRED_MUTE_OFF: { iRequiredMute = REQUIRED_MUTE_ON; Drive() }
+                if (object.PowerState.Actual == ACTUAL_POWER_ON) {
+                    if (object.Volume.Mute.Required) {
+                        switch (object.Volume.Mute.Required) {
+                            case REQUIRED_MUTE_ON: {
+                                object.Volume.Mute.Required = REQUIRED_MUTE_OFF
+                            }
+                            case REQUIRED_MUTE_OFF: {
+                                object.Volume.Mute.Required = REQUIRED_MUTE_ON
+                            }
                         }
                     }
                     else {
-                        switch (uDisplay.Volume.Mute.Actual) {
-                            case ACTUAL_MUTE_ON: { iRequiredMute = REQUIRED_MUTE_OFF; Drive() }
-                            case ACTUAL_MUTE_OFF: { iRequiredMute = REQUIRED_MUTE_ON; Drive() }
+                        switch (object.Volume.Mute.Actual) {
+                            case ACTUAL_MUTE_ON: {
+                                object.Volume.Mute.Required = REQUIRED_MUTE_OFF
+                            }
+                            case ACTUAL_MUTE_OFF: {
+                                object.Volume.Mute.Required = REQUIRED_MUTE_ON
+                            }
                         }
                     }
                 }
@@ -902,10 +930,19 @@ channel_event[vdvObject, 0] {
 }
 
 
-timeline_event[TL_DRIVE] { Drive() }
+timeline_event[TL_SOCKET_CHECK] {
+    MaintainSocketConnection()
+}
 
 
-timeline_event[TL_IP_CLIENT_CHECK] { MaintainIPConnection() }
+timeline_event[TL_NAV_LOGIC_ENGINE] {
+    NAVLogicEngineDrive(engine, timeline)
+}
+
+
+timeline_event[TL_NAV_DEVICE_PRIORITY_QUEUE_FAILED_RESPONSE] {
+    NAVDevicePriorityQueueFailedResponse(queue)
+}
 
 
 (***********************************************************)
