@@ -94,9 +94,10 @@ constant integer INPUT_USB_4                = 17
 constant integer INPUT_DIGITAL_LINK_1       = 18
 
 constant char INPUT_SNAPI_PARAMS[][NAV_MAX_CHARS]   =   {
-                                                            'VGA,1',
+                                                            'SLOT,1',
                                                             'SLOT,1,A',
                                                             'SLOT,1,B',
+                                                            'SLOT,2',
                                                             'SLOT,2,A',
                                                             'SLOT,2,B',
                                                             'SLOT,3',
@@ -127,10 +128,10 @@ constant char INPUT_COMMANDS[][NAV_MAX_CHARS]   =   {
                                                         'HM2',
                                                         'HM3',
                                                         'HM4',
-                                                        'UD1',
-                                                        'UD2',
-                                                        'UD3',
-                                                        'UD4',
+                                                        'UC1',
+                                                        'UC2',
+                                                        'UC3',
+                                                        'UC4',
                                                         'DL1'
                                                     }
 
