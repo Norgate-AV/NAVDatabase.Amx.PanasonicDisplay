@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.5.1](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/compare/v2.5.0...v2.5.1) (2025-10-07)
+
+### 🐛 Bug Fixes
+
+- use correct commands for USB-C ([1494788](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/commit/14947885369267e57719dd163f3ea7de3589aab5))
+
 ## [2.5.0](https://github.com/Norgate-AV/NAVDatabase.Amx.PanasonicDisplay/compare/v2.4.0...v2.5.0) (2025-09-20)
 
 ### 🌟 Features
